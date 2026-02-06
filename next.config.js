@@ -1,3 +1,5 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -7,10 +9,11 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.githubusercontent.com' },
     ],
   },
-  // Exclude worker directory from Next.js build
   webpack: (config) => {
+    // Explicitly set @ alias for reliable resolution on all platforms
     config.resolve.alias = {
       ...config.resolve.alias,
+      '@': path.resolve(__dirname),
     };
     return config;
   },
