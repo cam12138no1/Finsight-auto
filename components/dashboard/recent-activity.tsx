@@ -9,43 +9,61 @@ import {
   XCircle,
   Clock,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActivityItem {
   id: number;
-  type: 'download_started' | 'download_completed' | 'download_failed' | 'job_created';
+  type: 'download_started' | 'download_completed' | 'download_failed' |
+        'download_success' | 'job_created' | 'job_completed' | 'job_failed';
   message: string;
   timestamp: string;
-  company?: string;
 }
 
-const iconMap = {
+const iconMap: Record<string, React.ElementType> = {
   download_started: Download,
   download_completed: CheckCircle2,
+  download_success: CheckCircle2,
   download_failed: XCircle,
   job_created: Clock,
+  job_completed: CheckCircle2,
+  job_failed: XCircle,
 };
 
-const colorMap = {
+const colorMap: Record<string, string> = {
   download_started: 'text-blue-500',
   download_completed: 'text-emerald-500',
+  download_success: 'text-emerald-500',
   download_failed: 'text-red-500',
   job_created: 'text-gold-500',
+  job_completed: 'text-emerald-500',
+  job_failed: 'text-red-500',
 };
 
-// Placeholder data - will be replaced with real data from API
-const placeholderActivities: ActivityItem[] = [
-  {
-    id: 1,
-    type: 'job_created',
-    message: '系统就绪，等待首次下载任务',
-    timestamp: new Date().toISOString(),
-  },
-];
-
 export function RecentActivity() {
-  const activities = placeholderActivities;
+  const [activities, setActivities] = React.useState<ActivityItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchActivity() {
+      try {
+        const res = await fetch('/api/activity?limit=10');
+        const data = await res.json();
+        if (data.success && data.data?.length > 0) {
+          setActivities(data.data);
+        }
+      } catch (err) {
+        // Silently fail - activity is not critical
+        console.debug('Failed to fetch activity:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchActivity();
+    const interval = setInterval(fetchActivity, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Card className="glass-card">
@@ -56,7 +74,11 @@ export function RecentActivity() {
         </Badge>
       </CardHeader>
       <CardContent>
-        {activities.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : activities.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
             <Clock className="w-8 h-8 mb-2 opacity-50" />
             <p className="text-sm">暂无活动记录</p>
@@ -65,13 +87,14 @@ export function RecentActivity() {
         ) : (
           <div className="space-y-3">
             {activities.map((activity) => {
-              const Icon = iconMap[activity.type];
+              const Icon = iconMap[activity.type] || Clock;
+              const color = colorMap[activity.type] || 'text-muted-foreground';
               return (
                 <div
-                  key={activity.id}
-                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors duration-150 cursor-pointer"
+                  key={`${activity.type}-${activity.id}`}
+                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors duration-150"
                 >
-                  <div className={cn('mt-0.5', colorMap[activity.type])}>
+                  <div className={cn('mt-0.5', color)}>
                     <Icon className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">

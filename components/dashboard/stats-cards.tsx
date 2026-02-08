@@ -5,12 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   Building2,
   Download,
-  CheckCircle2,
-  TrendingUp,
   HardDrive,
   Activity,
+  TrendingUp,
+  Loader2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatBytes } from '@/lib/utils';
+import type { DashboardStats } from '@/types';
 
 interface StatCardProps {
   title: string;
@@ -19,9 +20,10 @@ interface StatCardProps {
   icon: React.ElementType;
   trend?: { value: number; label: string };
   color?: 'blue' | 'gold' | 'emerald' | 'purple';
+  loading?: boolean;
 }
 
-function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'blue' }: StatCardProps) {
+function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'blue', loading }: StatCardProps) {
   const colorMap = {
     blue: 'text-blue-500 bg-blue-500/10',
     gold: 'text-gold-500 bg-gold-500/10',
@@ -37,7 +39,11 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'blue' }:
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               {title}
             </span>
-            <span className="stat-number text-foreground">{value}</span>
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mt-1" />
+            ) : (
+              <span className="stat-number text-foreground">{value}</span>
+            )}
             {subtitle && (
               <span className="text-xs text-muted-foreground">{subtitle}</span>
             )}
@@ -61,40 +67,66 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'blue' }:
 }
 
 export function StatsCards() {
-  const stats: StatCardProps[] = [
+  const [stats, setStats] = React.useState<DashboardStats | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        if (data.success) {
+          setStats(data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+    const interval = setInterval(fetchStats, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const cards: StatCardProps[] = [
     {
       title: '跟踪公司',
-      value: 24,
-      subtitle: '10 AI应用 + 14 供应链',
+      value: stats?.total_companies ?? 24,
+      subtitle: `${stats?.active_companies ?? 24} 家活跃`,
       icon: Building2,
       color: 'blue',
+      loading,
     },
     {
       title: '下载任务',
-      value: 0,
-      subtitle: '0 进行中',
+      value: stats?.total_jobs ?? 0,
+      subtitle: `${stats?.running_jobs ?? 0} 进行中`,
       icon: Download,
       color: 'gold',
+      loading,
     },
     {
       title: '已下载文件',
-      value: 0,
-      subtitle: '0 MB 总大小',
+      value: stats?.total_files_downloaded ?? 0,
+      subtitle: stats ? `${formatBytes(stats.total_download_size)} 总大小` : '0 B 总大小',
       icon: HardDrive,
       color: 'emerald',
+      loading,
     },
     {
       title: '成功率',
-      value: '--',
-      subtitle: '暂无数据',
+      value: stats?.success_rate ? `${stats.success_rate}%` : '--',
+      subtitle: stats?.success_rate ? '基于所有下载任务' : '暂无数据',
       icon: Activity,
       color: 'purple',
+      loading,
     },
   ];
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map((stat, i) => (
+      {cards.map((stat, i) => (
         <StatCard key={i} {...stat} />
       ))}
     </div>

@@ -73,6 +73,7 @@ export interface CreateJobRequest {
   years: number[];
   quarters: string[];
   company_ids?: number[];
+  company_tickers?: string[];
   category_filter?: string;
 }
 
@@ -107,4 +108,9 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
   message?: string;
+  meta?: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
 }

@@ -35,6 +35,38 @@ const secondaryNav: NavItem[] = [
   { title: '设置', href: '/settings', icon: Settings },
 ];
 
+function SystemStatus() {
+  const [status, setStatus] = React.useState<'checking' | 'ok' | 'error'>('checking');
+
+  React.useEffect(() => {
+    async function check() {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+          setStatus('ok');
+        } else {
+          setStatus('error');
+        }
+      } catch {
+        setStatus('error');
+      }
+    }
+    check();
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-muted/50">
+      <Zap className={cn('w-3.5 h-3.5', status === 'ok' ? 'text-emerald-500' : status === 'error' ? 'text-red-500' : 'text-muted-foreground')} />
+      <span className="text-xs text-muted-foreground">
+        {status === 'ok' ? '系统运行正常' : status === 'error' ? '系统异常' : '检查中...'}
+      </span>
+      <span className={cn('ml-auto w-2 h-2 rounded-full', status === 'ok' ? 'bg-emerald-500 animate-pulse-slow' : status === 'error' ? 'bg-red-500' : 'bg-muted-foreground')} />
+    </div>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = React.useState(false);
@@ -135,11 +167,7 @@ export function Sidebar() {
       {/* System Status & Collapse */}
       <div className="border-t border-border p-3">
         {!collapsed && (
-          <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-muted/50">
-            <Zap className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-xs text-muted-foreground">系统运行正常</span>
-            <span className="ml-auto w-2 h-2 rounded-full bg-emerald-500 animate-pulse-slow" />
-          </div>
+          <SystemStatus />
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}

@@ -8,13 +8,21 @@ export async function GET() {
     const versionParts = row?.version ? String(row.version).split(' ') : [];
     return NextResponse.json({
       status: 'healthy',
-      database: 'connected',
+      database: {
+        status: 'connected',
+        version: versionParts.slice(0, 2).join(' '),
+      },
       timestamp: row?.time,
-      dbVersion: versionParts.slice(0, 2).join(' '),
     });
   } catch (error) {
     return NextResponse.json(
-      { status: 'unhealthy', database: 'disconnected', error: String(error) },
+      {
+        status: 'unhealthy',
+        database: {
+          status: 'disconnected',
+          error: String(error),
+        },
+      },
       { status: 503 }
     );
   }

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   Calendar, FileText, Building2, Download, ArrowLeft,
-  CheckCircle2, Brain, Cpu, Zap, Info
+  CheckCircle2, Brain, Cpu, Zap, Info, Loader2
 } from 'lucide-react';
 import { COMPANIES, type CompanyInfo } from '@/lib/companies';
 import { QUARTERS, YEAR_RANGE } from '@/types';
@@ -21,6 +21,7 @@ export default function NewDownloadPage() {
   const [selectedCompanies, setSelectedCompanies] = React.useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = React.useState<string>('all');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   const toggleYear = (year: number) => {
     setSelectedYears(prev =>
@@ -66,6 +67,7 @@ export default function NewDownloadPage() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await fetch('/api/downloads', {
         method: 'POST',
@@ -77,10 +79,14 @@ export default function NewDownloadPage() {
           category_filter: categoryFilter !== 'all' ? categoryFilter : undefined,
         }),
       });
-      if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
         router.push('/downloads');
+      } else {
+        setSubmitError(data.error || '创建任务失败');
       }
     } catch (error) {
+      setSubmitError('网络错误，请稍后重试');
       console.error('Failed to create job:', error);
     } finally {
       setIsSubmitting(false);
@@ -219,6 +225,13 @@ export default function NewDownloadPage() {
         </CardContent>
       </Card>
 
+      {/* Error */}
+      {submitError && (
+        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+          {submitError}
+        </div>
+      )}
+
       {/* Summary & Submit */}
       <Card className="glass-card border-primary/20">
         <CardContent className="p-5">
@@ -248,7 +261,7 @@ export default function NewDownloadPage() {
               onClick={handleSubmit}
             >
               {isSubmitting ? (
-                <Loader2Icon className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
@@ -261,10 +274,3 @@ export default function NewDownloadPage() {
   );
 }
 
-function Loader2Icon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-    </svg>
-  );
-}
