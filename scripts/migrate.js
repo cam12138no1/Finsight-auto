@@ -96,7 +96,26 @@ const migrations = [
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
   )`,
 
+  // ================================================================
+  // AI Analysis results (AI 财报分析结果)
+  // ================================================================
+  `CREATE TABLE IF NOT EXISTS analysis_results (
+    id SERIAL PRIMARY KEY,
+    filing_id INTEGER REFERENCES shared_filings(id),
+    company_id INTEGER REFERENCES companies(id),
+    year INTEGER,
+    quarter VARCHAR(10),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+    result JSONB,
+    error_message TEXT,
+    model VARCHAR(100) DEFAULT 'google/gemini-3-pro-preview',
+    duration_ms INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  )`,
+
   // Indexes
+  `CREATE INDEX IF NOT EXISTS idx_analysis_results_filing ON analysis_results(filing_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_analysis_results_company ON analysis_results(company_id)`,
   `CREATE INDEX IF NOT EXISTS idx_download_jobs_status ON download_jobs(status)`,
   `CREATE INDEX IF NOT EXISTS idx_download_jobs_created_at ON download_jobs(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_download_logs_job_id ON download_logs(job_id)`,

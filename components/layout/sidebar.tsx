@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
@@ -29,6 +30,7 @@ const mainNav: NavItem[] = [
   { title: '仪表盘', href: '/', icon: LayoutDashboard },
   { title: '公司管理', href: '/companies', icon: Building2 },
   { title: '下载中心', href: '/downloads', icon: Download },
+  { title: '财报分析', href: '/analysis', icon: BarChart3 },
   { title: '财报/研报', href: '/reports', icon: FileText },
   { title: '历史记录', href: '/history', icon: History },
 ];
