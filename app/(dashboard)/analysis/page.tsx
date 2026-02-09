@@ -340,7 +340,7 @@ function AnalysisResultView({ result }: { result: any }) {
             </div>
             <div>
               <p className="font-semibold text-red-400 mb-1">主要风险</p>
-              {result.sustainability_risks.main_risks?.map((r: string, i: number) => <p key={i} className="text-muted-foreground">⚠ {typeof r === 'string' ? r : r.risk}</p>)}
+              {result.sustainability_risks.main_risks?.map((r: string | { risk: string }, i: number) => <p key={i} className="text-muted-foreground">⚠ {typeof r === 'string' ? r : r.risk}</p>)}
             </div>
             <div>
               <p className="font-semibold text-blue-400 mb-1">检查点</p>
