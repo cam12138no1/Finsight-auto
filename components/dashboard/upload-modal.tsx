@@ -300,31 +300,73 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
     setUploadProgress('准备上传文件...')
 
     try {
-      // ★★★ 第一步：使用 Vercel Blob 客户端直接上传文件 ★★★
+      // ★★★ 第一步：上传文件 ★★★
+      // 尝试 Vercel Blob, 如果不可用则走 FormData 直接上传
       const uploadedFinancialFiles: UploadedFile[] = []
       const uploadedResearchFiles: UploadedFile[] = []
+      let useFallbackUpload = false
       
-      // 上传财报文件
-      for (let i = 0; i < financialFiles.length; i++) {
-        const item = financialFiles[i]
-        setUploadProgress(`上传财报 ${i + 1}/${financialFiles.length}: ${item.file.name}`)
-        const uploaded = await uploadFileToBlob(item.file, 'financial')
-        uploadedFinancialFiles.push(uploaded)
+      try {
+        // 尝试 Blob 上传
+        for (let i = 0; i < financialFiles.length; i++) {
+          const item = financialFiles[i]
+          setUploadProgress(`上传财报 ${i + 1}/${financialFiles.length}: ${item.file.name}`)
+          const uploaded = await uploadFileToBlob(item.file, 'financial')
+          uploadedFinancialFiles.push(uploaded)
+        }
+        for (let i = 0; i < researchFiles.length; i++) {
+          const item = researchFiles[i]
+          setUploadProgress(`上传研报 ${i + 1}/${researchFiles.length}: ${item.file.name}`)
+          const uploaded = await uploadFileToBlob(item.file, 'research')
+          uploadedResearchFiles.push(uploaded)
+        }
+      } catch (blobError: any) {
+        // Blob 不可用 (Render 部署) — 走 FormData 直接上传分析
+        console.log('[前端] Blob上传不可用，切换到直接上传模式:', blobError.message)
+        useFallbackUpload = true
+      }
+
+      // 如果 Blob 不可用，走 /api/reports/upload (FormData 直接上传+分析)
+      if (useFallbackUpload) {
+        setUploadProgress('直接上传分析中...')
+        setAnalysisStatus('analyzing')
+        
+        const formData = new FormData()
+        formData.append('requestId', requestId)
+        formData.append('category', selectedCategory || '')
+        formData.append('fiscalYear', String(selectedYear))
+        formData.append('fiscalQuarter', String(selectedQuarter))
+        for (const item of financialFiles) {
+          formData.append('files', item.file)
+        }
+        for (const item of researchFiles) {
+          formData.append('researchFiles', item.file)
+        }
+        
+        const response = await fetch('/api/reports/upload', {
+          method: 'POST',
+          body: formData,
+          signal: abortControllerRef.current?.signal,
+        })
+        
+        if (currentRequestIdRef.current !== requestId) return
+        
+        const result = await response.json()
+        if (response.ok && !result.error) {
+          setAnalysisStatus('success')
+          toast({ title: '分析完成', description: result.analysis?.one_line_conclusion || '分析已保存' })
+          setTimeout(() => { onClose(); onSuccess() }, 1500)
+        } else {
+          throw new Error(result.error || '分析失败')
+        }
+        return // Early return — fallback path complete
       }
       
-      // 上传研报文件
-      for (let i = 0; i < researchFiles.length; i++) {
-        const item = researchFiles[i]
-        setUploadProgress(`上传研报 ${i + 1}/${researchFiles.length}: ${item.file.name}`)
-        const uploaded = await uploadFileToBlob(item.file, 'research')
-        uploadedResearchFiles.push(uploaded)
-      }
-      
-      console.log('[前端] 文件上传完成，开始分析')
+      console.log('[前端] Blob文件上传完成，开始分析')
       setUploadProgress('')
       setAnalysisStatus('analyzing')
 
-      // ★★★ 第二步：调用分析API，传递Blob URL而不是文件 ★★★
+      // ★★★ 第二步：调用分析API，传递Blob URL ★★★
       console.log('[前端] 发送请求到 /api/reports/analyze')
       
       // ★★★ 新增：超时处理和状态轮询机制 ★★★
