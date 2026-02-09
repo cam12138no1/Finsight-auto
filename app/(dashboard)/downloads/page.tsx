@@ -33,8 +33,7 @@ function JobCard({
   const progress = job.progress_percent;
 
   return (
-    <Link href={`/downloads/${job.id}`} className="block">
-      <div className="group p-4 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-muted/30 transition-all duration-200 cursor-pointer">
+    <div className="group p-4 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-muted/30 transition-all duration-200">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className={cn('p-2 rounded-lg', `${config.color} bg-current/10`)}>
@@ -104,7 +103,7 @@ function JobCard({
           <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 

@@ -152,12 +152,15 @@ async def download_filing(filing_id: int):
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
 
-    content = bytes(filing['file_content'])
+    raw = filing.get('file_content')
+    if not raw:
+        raise HTTPException(status_code=404, detail="Filing content is empty")
+    content = bytes(raw) if not isinstance(raw, bytes) else raw
     return Response(
         content=content,
         media_type=filing.get('content_type', 'application/octet-stream'),
         headers={
-            "Content-Disposition": f"attachment; filename=\"{filing['filename']}\"",
+            "Content-Disposition": f"attachment; filename=\"{filing.get('filename', 'download')}\"",
             "Content-Length": str(len(content)),
         }
     )
@@ -189,7 +192,8 @@ async def upload_report(
     if len(content) > 50 * 1024 * 1024:  # 50MB limit
         raise HTTPException(status_code=413, detail="File too large (max 50MB)")
 
-    report_id = db.save_user_report(
+    loop = asyncio.get_event_loop()
+    report_id = await loop.run_in_executor(None, lambda: db.save_user_report(
         title=title,
         filename=file.filename or "report.pdf",
         content_type=file.content_type or "application/octet-stream",
@@ -199,7 +203,7 @@ async def upload_report(
         year=year if year else None,
         quarter=quarter if quarter else None,
         description=description,
-    )
+    ))
     return {"id": report_id, "message": "Report uploaded successfully"}
 
 
@@ -211,12 +215,15 @@ async def download_report(report_id: int):
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    content = bytes(report['file_content'])
+    raw = report.get('file_content')
+    if not raw:
+        raise HTTPException(status_code=404, detail="Report content is empty")
+    content = bytes(raw) if not isinstance(raw, bytes) else raw
     return Response(
         content=content,
         media_type=report.get('content_type', 'application/octet-stream'),
         headers={
-            "Content-Disposition": f"attachment; filename=\"{report['filename']}\"",
+            "Content-Disposition": f"attachment; filename=\"{report.get('filename', 'download')}\"",
             "Content-Length": str(len(content)),
         }
     )

@@ -1,6 +1,7 @@
 """
 Database connection and query utilities for the worker.
 Synchronous psycopg2 with ThreadedConnectionPool.
+Column-name whitelists prevent SQL injection on dynamic updates.
 """
 
 import os
@@ -13,6 +14,16 @@ import psycopg2.extras
 import psycopg2.pool
 
 logger = logging.getLogger('finsight-worker.db')
+
+# Whitelists for dynamic column updates (prevents SQL injection)
+_JOB_UPDATE_COLUMNS = frozenset({
+    'status', 'started_at', 'completed_at', 'error_message',
+    'total_files', 'completed_files', 'failed_files',
+})
+_LOG_UPDATE_COLUMNS = frozenset({
+    'status', 'filename', 'file_url', 'file_size',
+    'error_message', 'download_duration_ms',
+})
 
 
 class Database:
@@ -40,6 +51,8 @@ class Database:
 
     @contextmanager
     def _get_conn(self):
+        if self._pool is None:
+            raise RuntimeError("Database not connected. Call connect() first.")
         conn = self._pool.getconn()
         conn.autocommit = True
         try:
@@ -91,9 +104,12 @@ class Database:
         )
 
     def update_job_status(self, job_id: int, status: str, **kwargs):
+        """Update job status. Only whitelisted columns are allowed."""
         sets = ["status = %s"]
         params: list = [status]
         for key, value in kwargs.items():
+            if key not in _JOB_UPDATE_COLUMNS:
+                raise ValueError(f"Invalid column for job update: {key}")
             sets.append(f"{key} = %s")
             params.append(value)
         params.append(job_id)
@@ -110,9 +126,9 @@ class Database:
     # ----------------------------------------------------------------
     # Company operations
     # ----------------------------------------------------------------
-    def get_companies(self, ids: List[int] = None, category: str = None) -> List[Dict]:
+    def get_companies(self, ids: Optional[List[int]] = None, category: Optional[str] = None) -> List[Dict]:
         sql = "SELECT * FROM companies WHERE is_active = true"
-        params = []
+        params: list = []
         if ids:
             sql += " AND id = ANY(%s)"
             params.append(ids)
@@ -137,9 +153,12 @@ class Database:
         return result['id'] if result else 0
 
     def update_download_log(self, log_id: int, **kwargs):
-        sets = []
-        params = []
+        """Update download log. Only whitelisted columns are allowed."""
+        sets: list = []
+        params: list = []
         for key, value in kwargs.items():
+            if key not in _LOG_UPDATE_COLUMNS:
+                raise ValueError(f"Invalid column for log update: {key}")
             sets.append(f"{key} = %s")
             params.append(value)
         sets.append("updated_at = NOW()")
@@ -159,7 +178,6 @@ class Database:
     # Shared filings (财报永久存储, 所有用户共享, 按公司/年/季度去重)
     # ----------------------------------------------------------------
     def get_shared_filing(self, company_id: int, year: int, quarter: str) -> Optional[Dict]:
-        """Check if a filing already exists (without loading content)"""
         return self._execute_one(
             """SELECT id, company_id, year, quarter, filename, file_url, content_type, file_size, created_at
                FROM shared_filings WHERE company_id = %s AND year = %s AND quarter = %s""",
@@ -171,7 +189,6 @@ class Database:
         filename: str, file_url: str, content_type: str,
         file_content: bytes, source: str = 'sec_edgar'
     ) -> int:
-        """Save a filing. If already exists for this company/year/quarter, skip (return existing id)."""
         existing = self.get_shared_filing(company_id, year, quarter)
         if existing:
             logger.info(f"Filing already exists: company={company_id} {year} {quarter}, skipping")
@@ -192,26 +209,15 @@ class Database:
                 return row['id'] if row else 0
 
     def get_shared_filing_content(self, filing_id: int) -> Optional[Dict]:
-        """Get filing with content for download"""
-        return self._execute_one(
-            "SELECT * FROM shared_filings WHERE id = %s", (filing_id,)
-        )
+        return self._execute_one("SELECT * FROM shared_filings WHERE id = %s", (filing_id,))
 
-    def get_shared_filing_by_key(self, company_id: int, year: int, quarter: str) -> Optional[Dict]:
-        """Get filing content by company/year/quarter"""
-        return self._execute_one(
-            "SELECT * FROM shared_filings WHERE company_id = %s AND year = %s AND quarter = %s",
-            (company_id, year, quarter)
-        )
-
-    def list_shared_filings(self, company_id: int = None) -> List[Dict]:
-        """List filings metadata (no content)"""
+    def list_shared_filings(self, company_id: Optional[int] = None) -> List[Dict]:
         sql = """SELECT sf.id, sf.company_id, sf.year, sf.quarter, sf.filename,
                         sf.file_url, sf.content_type, sf.file_size, sf.source, sf.created_at,
                         c.name as company_name, c.ticker as company_ticker, c.category
                  FROM shared_filings sf
                  LEFT JOIN companies c ON sf.company_id = c.id"""
-        params = []
+        params: list = []
         if company_id:
             sql += " WHERE sf.company_id = %s"
             params.append(company_id)
@@ -224,8 +230,8 @@ class Database:
     def save_user_report(
         self, title: str, filename: str, content_type: str,
         file_content: bytes, uploader_name: str = 'anonymous',
-        company_id: int = None, year: int = None, quarter: str = None,
-        description: str = ''
+        company_id: Optional[int] = None, year: Optional[int] = None,
+        quarter: Optional[str] = None, description: str = ''
     ) -> int:
         with self._get_conn() as conn:
             with conn.cursor() as cur:
@@ -244,11 +250,11 @@ class Database:
     def get_user_report(self, report_id: int) -> Optional[Dict]:
         return self._execute_one("SELECT * FROM user_reports WHERE id = %s", (report_id,))
 
-    def list_user_reports(self, company_id: int = None) -> List[Dict]:
+    def list_user_reports(self, company_id: Optional[int] = None) -> List[Dict]:
         sql = """SELECT id, uploader_name, company_id, title, description,
                         year, quarter, filename, content_type, file_size, created_at
                  FROM user_reports"""
-        params = []
+        params: list = []
         if company_id:
             sql += " WHERE company_id = %s"
             params.append(company_id)

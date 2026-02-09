@@ -9,43 +9,45 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search');
     const status = searchParams.get('status');
     const jobId = searchParams.get('job_id');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200);
+    const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0);
 
-    let sql = `
-      SELECT dl.*, c.name as company_name, c.ticker as company_ticker
-      FROM download_logs dl
-      LEFT JOIN companies c ON dl.company_id = c.id
-      WHERE 1=1
-    `;
-    const params: unknown[] = [];
+    // Build WHERE clause (shared between data and count query)
+    let whereClause = ' WHERE 1=1';
+    const filterParams: unknown[] = [];
     let paramIndex = 1;
 
     if (jobId) {
-      sql += ` AND dl.job_id = $${paramIndex++}`;
-      params.push(parseInt(jobId));
+      whereClause += ` AND dl.job_id = $${paramIndex++}`;
+      filterParams.push(parseInt(jobId));
     }
-
     if (status) {
-      sql += ` AND dl.status = $${paramIndex++}`;
-      params.push(status);
+      whereClause += ` AND dl.status = $${paramIndex++}`;
+      filterParams.push(status);
     }
-
     if (search) {
-      sql += ` AND (LOWER(c.name) LIKE $${paramIndex} OR LOWER(c.ticker) LIKE $${paramIndex} OR LOWER(dl.filename) LIKE $${paramIndex})`;
-      params.push(`%${search.toLowerCase()}%`);
+      whereClause += ` AND (LOWER(c.name) LIKE $${paramIndex} OR LOWER(c.ticker) LIKE $${paramIndex} OR LOWER(dl.filename) LIKE $${paramIndex})`;
+      filterParams.push(`%${search.toLowerCase()}%`);
       paramIndex++;
     }
 
-    // Count query
-    const countSql = sql.replace(/SELECT dl\.\*, c\.name as company_name, c\.ticker as company_ticker/, 'SELECT COUNT(*) as total');
-    const countResult = await query(countSql, params);
+    const fromClause = `FROM download_logs dl LEFT JOIN companies c ON dl.company_id = c.id`;
+
+    // Count query (separate, not regex-replaced)
+    const countResult = await query(
+      `SELECT COUNT(*) as total ${fromClause} ${whereClause}`,
+      filterParams
+    );
     const total = parseInt(String(countResult.rows[0]?.total ?? '0'));
 
-    sql += ` ORDER BY dl.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-    params.push(limit, offset);
-
-    const result = await query(sql, params);
+    // Data query with pagination
+    const dataParams = [...filterParams, limit, offset];
+    const result = await query(
+      `SELECT dl.*, c.name as company_name, c.ticker as company_ticker
+       ${fromClause} ${whereClause}
+       ORDER BY dl.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
+      dataParams
+    );
 
     return NextResponse.json({
       success: true,
