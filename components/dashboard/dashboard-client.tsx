@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Plus, Upload, Loader2, TrendingUp, TrendingDown, Minus, ChevronRight, FileText, Building2, Cpu, Trash2, Filter, X } from 'lucide-react'
+import { Plus, Upload, Loader2, TrendingUp, TrendingDown, Minus, ChevronRight, FileText, Building2, Cpu, Trash2, Filter, X, Database } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import UploadModal from './upload-modal'
 import AnalysisModal from './analysis-modal'
+import FilingSelector from './filing-selector'
 
 interface Analysis {
   id: string
@@ -108,6 +109,7 @@ const CATEGORY_OPTIONS = [
 
 export default function DashboardClient() {
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [isFilingSelectorOpen, setIsFilingSelectorOpen] = useState(false)
   const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null)
   const [analyses, setAnalyses] = useState<Analysis[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -466,13 +468,23 @@ export default function DashboardClient() {
                 <p className="text-xs text-slate-500">智析财报 · 投委会级分析</p>
               </div>
             </div>
-            <Button 
-              onClick={() => setIsUploadOpen(true)}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              上传财报
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => setIsFilingSelectorOpen(true)}
+                variant="outline"
+                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+              >
+                <Database className="mr-2 h-4 w-4" />
+                选择已有财报
+              </Button>
+              <Button 
+                onClick={() => setIsUploadOpen(true)}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                上传财报
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -747,8 +759,19 @@ export default function DashboardClient() {
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onSuccess={() => {
-          // 上传成功后立即刷新
           loadDashboardData(true)
+        }}
+      />
+
+      {/* Filing Selector Modal (从数据库选择已下载财报) */}
+      <FilingSelector
+        isOpen={isFilingSelectorOpen}
+        onClose={() => setIsFilingSelectorOpen(false)}
+        onSelect={async (filing) => {
+          setIsFilingSelectorOpen(false)
+          // Open upload modal pre-filled — or directly trigger analysis
+          // For now, open upload modal and let user proceed
+          setIsUploadOpen(true)
         }}
       />
 
