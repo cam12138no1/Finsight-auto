@@ -1,95 +1,259 @@
-# Finsight Auto
+# Private Fund Analysis Platform
 
-AI 行业上市公司财报自动化下载与分析平台，覆盖 24 家 AI 龙头企业。
+Enterprise-grade financial report analysis platform for private equity funds, powered by AI.
 
-## 技术架构
+## 🚀 Features
 
-| 层级 | 技术 | 说明 |
-|------|------|------|
-| 前端 | Next.js 14, TypeScript, Tailwind CSS | 金融级数据仪表盘 |
-| UI 组件 | shadcn/ui (Radix UI) | 一致的设计系统 |
-| 后端 API | Next.js API Routes | RESTful 接口 |
-| 下载引擎 | Python FastAPI | SEC EDGAR API + IR 页面爬取 |
-| 数据库 | PostgreSQL 16 (Render) | 任务管理与日志存储 |
-| 部署 | Render | Web Service + Worker |
+- **AI-Powered Analysis**: Leverages Gemini 3 Pro via OpenRouter for comprehensive financial report analysis
+- **Multi-Format Support**: Upload PDF, Excel, or text documents
+- **Structured Output**: Analysis follows sell-side analyst format with:
+  - Executive summary & one-line conclusion
+  - Results vs market expectations
+  - Key growth drivers (demand, monetization, efficiency)
+  - Investment ROI analysis
+  - Sustainability & risk assessment
+  - Model impact & recommendations
+- **Enterprise Security**: JWT-based authentication, role-based access control
+- **Cloud-Native**: Built for Vercel deployment with Neon Postgres
+- **Beautiful UI**: Clean, professional interface optimized for financial professionals
+- **Bilingual**: Full English and Chinese support
 
-## 功能特性
+## 📋 Prerequisites
 
-- **24 家 AI 龙头企业** - 10 家 AI 应用 + 14 家 AI 供应链
-- **SEC EDGAR API** - 优先使用官方 API 获取美股财报
-- **智能识别** - 自动匹配年份、季度、报告类型
-- **批量下载** - 支持多年份、多季度、多公司组合下载
-- **实时进度** - 下载任务实时状态追踪
-- **专业 UI** - 金融私募基金风格的暗色主题
+- Node.js 18.17.0 or higher
+- A Vercel account
+- An OpenRouter API key ([Get one here](https://openrouter.ai/keys))
 
-## 覆盖公司
+## 🛠️ Local Development Setup
 
-### AI 应用 (10)
-Microsoft, Alphabet, Amazon, Meta, Salesforce, ServiceNow, Palantir, Apple, AppLovin, Adobe
-
-### AI 供应链 (14)
-Nvidia, AMD, Broadcom, TSMC, SK Hynix, Micron, Samsung, Intel, Vertiv, Eaton, GE Vernova, Vistra, ASML, Synopsys
-
-## 本地开发
+### 1. Clone the repository
 
 ```bash
-# 安装依赖
+git clone https://github.com/YOUR_USERNAME/private-fund-analysis.git
+cd private-fund-analysis
+```
+
+### 2. Install dependencies
+
+```bash
 npm install
+```
 
-# 配置环境变量
+### 3. Configure environment variables
+
+Copy the template and fill in your values:
+
+```bash
 cp .env.local.template .env.local
-# 编辑 .env.local 填入数据库连接信息
+```
 
-# 运行数据库迁移
+Edit `.env.local` with your credentials:
+
+```env
+# Database (Get from Vercel after deployment)
+DATABASE_URL="postgresql://..."
+
+# OpenRouter API (Get from https://openrouter.ai/keys)
+OPENROUTER_API_KEY="sk-or-v1-..."
+
+# NextAuth
+NEXTAUTH_SECRET="your-secret-here"
+NEXTAUTH_URL="http://localhost:3000"
+
+# Vercel Blob (Get from Vercel after deployment)
+BLOB_READ_WRITE_TOKEN="vercel_blob_..."
+
+# JWT
+JWT_SECRET="your-jwt-secret"
+```
+
+### 4. Run database migrations
+
+After setting up your database, run:
+
+```bash
 npm run db:migrate
+```
 
-# 填充初始数据
-npm run db:seed
+### 5. Start development server
 
-# 启动开发服务器
+```bash
 npm run dev
 ```
 
-## 部署
+Visit [http://localhost:3000](http://localhost:3000)
 
-项目部署在 Render 平台：
-- **前端**: Node.js Web Service
-- **下载引擎**: Python Web Service
-- **数据库**: Render PostgreSQL 16
+## 🚢 Deployment to Vercel
 
-## 项目结构
+### 1. Push to GitHub
 
-```
-Finsight-auto/
-├── app/                    # Next.js App Router
-│   ├── (dashboard)/        # 仪表盘路由组
-│   │   ├── page.tsx        # 仪表盘首页
-│   │   ├── companies/      # 公司管理
-│   │   ├── downloads/      # 下载中心
-│   │   ├── history/        # 历史记录
-│   │   └── settings/       # 系统设置
-│   └── api/                # API 路由
-├── components/             # React 组件
-│   ├── ui/                 # 基础 UI 组件
-│   ├── layout/             # 布局组件
-│   ├── dashboard/          # 仪表盘组件
-│   └── ...
-├── lib/                    # 工具库
-├── types/                  # TypeScript 类型
-├── worker/                 # Python 下载引擎
-│   ├── main.py             # FastAPI 入口
-│   ├── downloader.py       # 下载核心逻辑
-│   └── database.py         # 数据库操作
-└── scripts/                # 数据库迁移脚本
+```bash
+git add .
+git commit -m "Initial commit"
+git push origin main
 ```
 
-## 合并计划
+### 2. Import to Vercel
 
-本项目设计为与 [private-fund-analysis](https://github.com/cam12138no1/private-fund-analysis) 合并：
-- 共享相同的技术栈 (Next.js 14 + TypeScript + Tailwind)
-- 下载功能将作为新的路由组集成
-- Python Worker 保持独立微服务架构
+1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+2. Click "Add New" → "Project"
+3. Import your GitHub repository
+4. Vercel will auto-detect Next.js configuration
 
-## 许可证
+### 3. Add Neon Postgres
 
-MIT License
+1. In Vercel project settings, go to "Storage"
+2. Click "Create Database" → Select "Neon Postgres"
+3. This automatically sets `DATABASE_URL` environment variable
+
+### 4. Add Blob Storage
+
+1. In Vercel project settings, go to "Storage"
+2. Click "Create Store" → Select "Blob"
+3. This automatically sets `BLOB_READ_WRITE_TOKEN`
+
+### 5. Configure Environment Variables
+
+In Vercel project settings → "Environment Variables", add:
+
+```
+OPENROUTER_API_KEY=sk-or-v1-...
+NEXTAUTH_SECRET=(generate with: openssl rand -base64 32)
+NEXTAUTH_URL=https://your-domain.vercel.app
+JWT_SECRET=(generate with: openssl rand -base64 32)
+```
+
+### 6. Run Database Migration
+
+After first deployment, use Vercel CLI to run migrations:
+
+```bash
+vercel env pull .env.local
+npm run db:migrate
+```
+
+### 7. Deploy
+
+```bash
+git push origin main
+```
+
+Vercel will automatically deploy on every push to main.
+
+## 📖 Usage
+
+### Default Login Credentials
+
+```
+Email: admin@example.com
+Password: admin123
+```
+
+**⚠️ IMPORTANT**: Change the default password immediately in production!
+
+### Uploading a Report
+
+1. Click "Upload Report" button
+2. Fill in company information:
+   - Company name (e.g., "Apple Inc.")
+   - Stock symbol (e.g., "AAPL")
+   - Report type (10-Q, 10-K, 8-K)
+   - Fiscal year and quarter
+   - Filing date
+3. (Optional) Add market consensus data
+4. Upload the financial report document
+5. Click "Upload & Analyze"
+
+The system will:
+- Extract text from the document
+- Send to Gemini 3 Pro for analysis
+- Generate structured insights
+- Store results in database
+
+### Viewing Analysis
+
+- Click on any analyzed report in the list
+- Review the comprehensive analysis including:
+  - Beat/miss vs consensus
+  - Driver decomposition
+  - Investment ROI
+  - Risk factors
+  - Model recommendations
+
+## 🏗️ Architecture
+
+```
+Next.js 14 (App Router)
+├── Frontend: React + TypeScript + Tailwind CSS
+├── Backend: Next.js API Routes
+├── Database: Neon Postgres (Serverless)
+├── Storage: Vercel Blob
+├── AI: Gemini 3 Pro (via OpenRouter)
+└── Auth: NextAuth.js + JWT
+```
+
+## 📁 Project Structure
+
+```
+private-fund-analysis/
+├── .specify/              # GitHub Spec Kit compliance
+├── app/                   # Next.js App Router
+│   ├── api/              # API routes
+│   ├── auth/             # Authentication pages
+│   └── dashboard/        # Main application
+├── components/            # React components
+│   ├── ui/               # UI primitives
+│   └── dashboard/        # Feature components
+├── lib/                   # Utilities
+│   ├── ai/               # AI integration
+│   ├── auth.ts           # Authentication config
+│   ├── db/               # Database queries
+│   └── document-parser.ts # Document extraction
+└── infrastructure/        # External integrations
+```
+
+## 🔒 Security Features
+
+- JWT session management (30-minute timeout)
+- Role-based access control (analyst, manager, admin)
+- Secure password hashing with bcrypt
+- Environment variable protection
+- SQL injection prevention (parameterized queries)
+- HTTPS-only in production
+
+## 💰 Cost Estimate
+
+For 1,000 active users/month:
+
+- Vercel Pro: $20/month
+- Neon Postgres (2GB): $19/month
+- Vercel Blob (10GB): $0.23/month
+- OpenRouter API (100K tokens): ~$50/month
+
+**Total: ~$89/month**
+
+## 🤝 Contributing
+
+This project follows [GitHub Spec Kit](https://github.com/github/spec-kit) conventions.
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 🆘 Support
+
+For issues or questions:
+1. Check the [GitHub Issues](https://github.com/YOUR_USERNAME/private-fund-analysis/issues)
+2. Consult OpenRouter documentation: https://openrouter.ai/docs
+3. Vercel deployment guide: https://vercel.com/docs
+
+## 🔗 Links
+
+- [Live Demo](https://your-domain.vercel.app)
+- [OpenRouter API](https://openrouter.ai)
+- [Neon Postgres](https://neon.tech)
+- [Vercel Platform](https://vercel.com)
+
+---
+
+Built with ❤️ for private equity professionals

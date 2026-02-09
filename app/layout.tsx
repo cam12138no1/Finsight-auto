@@ -1,16 +1,37 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import './globals.css'
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages, getLocale } from 'next-intl/server'
+import { Providers } from '@/components/providers'
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Finsight Auto - AI 财报自动化下载平台',
-  description: 'AI行业上市公司财报自动化下载与分析系统，覆盖24家AI龙头企业',
-  icons: { icon: '/favicon.ico' },
-};
+  title: 'AI金融工具 | AI Financial Tools',
+  description: 'AI-powered financial report analysis for private equity funds | AI驱动的私募基金财报分析工具',
+  icons: {
+    icon: '/favicon.ico',
+  },
+}
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const locale = await getLocale()
+  const messages = await getMessages()
+
   return (
-    <html lang="zh-CN" className="dark" suppressHydrationWarning>
-      <body className="min-h-screen bg-background font-sans antialiased">{children}</body>
+    <html lang={locale} suppressHydrationWarning>
+      <body className={inter.className}>
+        <NextIntlClientProvider messages={messages}>
+          <Providers>
+            {children}
+          </Providers>
+        </NextIntlClientProvider>
+      </body>
     </html>
-  );
+  )
 }

@@ -1,8 +1,5 @@
+import pdf from 'pdf-parse'
 import * as XLSX from 'xlsx'
-
-// pdf-parse has no default export in newer versions
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdf = require('pdf-parse');
 
 // Maximum text length to send to AI (to avoid token limits)
 // Gemini 3 Pro has 1M token context, so we can use much larger limits

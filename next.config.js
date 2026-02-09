@@ -1,22 +1,15 @@
-const path = require('path');
+const createNextIntlPlugin = require('next-intl/plugin')
+
+const withNextIntl = createNextIntlPlugin()
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  experimental: {
+    serverComponentsExternalPackages: ['pdf-parse'],
+  },
   images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: 'logo.clearbit.com' },
-      { protocol: 'https', hostname: '**.githubusercontent.com' },
-    ],
+    domains: ['blob.vercel-storage.com'],
   },
-  webpack: (config) => {
-    // Explicitly set @ alias for reliable resolution on all platforms
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': path.resolve(__dirname),
-    };
-    return config;
-  },
-};
+}
 
-module.exports = nextConfig;
+module.exports = withNextIntl(nextConfig)

@@ -1,92 +1,59 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-import type { ApiResponse } from '@/types';
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { analysisStore } from '@/lib/store'
 
-// GET: List user-uploaded research reports
-export async function GET(req: NextRequest) {
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const companyId = searchParams.get('company_id');
-
-    let sql = `
-      SELECT ur.id, ur.uploader_name, ur.company_id, ur.title, ur.description,
-             ur.year, ur.quarter, ur.filename, ur.content_type, ur.file_size, ur.created_at,
-             c.name as company_name, c.ticker as company_ticker
-      FROM user_reports ur
-      LEFT JOIN companies c ON ur.company_id = c.id
-    `;
-    const params: unknown[] = [];
-    if (companyId) {
-      sql += ' WHERE ur.company_id = $1';
-      params.push(parseInt(companyId));
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    sql += ' ORDER BY ur.created_at DESC';
 
-    const result = await query(sql, params);
-    return NextResponse.json({ success: true, data: result.rows });
-  } catch (error) {
+    const userId = session.user.id
+
+    // Use async store methods (用户隔离)
+    const allAnalyses = await analysisStore.getAll(userId)
+    
+    console.log(`[Reports API] Retrieved ${allAnalyses.length} analyses`)
+    
+    // Group by company
+    const companiesMap = new Map<string, any>()
+    
+    for (const analysis of allAnalyses) {
+      const symbol = analysis.company_symbol
+      if (!companiesMap.has(symbol)) {
+        companiesMap.set(symbol, {
+          id: symbol,
+          symbol: symbol,
+          name: analysis.company_name,
+          reports: [],
+        })
+      }
+      
+      companiesMap.get(symbol).reports.push({
+        id: analysis.id,
+        report_type: analysis.report_type,
+        fiscal_year: analysis.fiscal_year,
+        fiscal_quarter: analysis.fiscal_quarter,
+        filing_date: analysis.filing_date,
+        processed: analysis.processed,
+        processing: analysis.processing,
+        error: analysis.error,
+        analysis: analysis,
+      })
+    }
+
+    const companies = Array.from(companiesMap.values())
+
+    return NextResponse.json({ companies })
+  } catch (error: any) {
+    console.error('Get reports error:', error)
     return NextResponse.json(
-      { success: false, error: String(error) } satisfies ApiResponse<never>,
+      { error: error.message || 'Failed to fetch reports' },
       { status: 500 }
-    );
-  }
-}
-
-// POST: Upload a research report
-export async function POST(req: NextRequest) {
-  try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    const title = formData.get('title') as string;
-    const uploaderName = (formData.get('uploader_name') as string) || 'anonymous';
-    const companyId = formData.get('company_id') as string | null;
-    const year = formData.get('year') as string | null;
-    const quarter = formData.get('quarter') as string | null;
-    const description = (formData.get('description') as string) || '';
-
-    if (!file || !title) {
-      return NextResponse.json(
-        { success: false, error: '请提供文件和标题' },
-        { status: 400 }
-      );
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-    if (buffer.length > 50 * 1024 * 1024) {
-      return NextResponse.json(
-        { success: false, error: '文件不能超过 50MB' },
-        { status: 413 }
-      );
-    }
-
-    const result = await query(
-      `INSERT INTO user_reports
-         (uploader_name, company_id, title, description, year, quarter,
-          filename, content_type, file_size, file_content)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id`,
-      [
-        uploaderName,
-        companyId ? parseInt(companyId) : null,
-        title,
-        description,
-        year ? parseInt(year) : null,
-        quarter || null,
-        file.name,
-        file.type || 'application/octet-stream',
-        buffer.length,
-        buffer,
-      ]
-    );
-
-    return NextResponse.json(
-      { success: true, data: { id: result.rows[0]?.id }, message: '研报上传成功' },
-      { status: 201 }
-    );
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: String(error) },
-      { status: 500 }
-    );
+    )
   }
 }

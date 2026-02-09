@@ -1,5 +1,5 @@
-import { openrouter } from '@/lib/openrouter'
-import { getCompanyCategory, COMPANY_CATEGORIES } from '@/lib/ai/prompts'
+import { openrouter } from '../openrouter'
+import { getCompanyCategory, COMPANY_CATEGORIES } from './prompts'
 
 export interface ReportMetadata {
   company: string
