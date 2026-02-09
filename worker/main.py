@@ -1,19 +1,16 @@
 """
 Finsight Auto - Download Worker
 FastAPI service for processing financial report download jobs.
-Uses async job polling with sync database operations run in thread pool.
+Files are stored permanently in PostgreSQL (no filesystem dependency).
 """
 
 import os
 import asyncio
-import signal
 import logging
-from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import Database
@@ -28,27 +25,16 @@ logger = logging.getLogger('finsight-worker')
 db = Database()
 downloader = EarningsDownloader(db)
 
-# File storage directory
-DOWNLOAD_DIR = os.environ.get('DOWNLOAD_DIR', '/tmp/finsight_reports')
-Path(DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
-
-# Graceful shutdown flag
 _shutdown_event = asyncio.Event()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan handler with graceful shutdown"""
     logger.info("Starting Finsight Auto Worker...")
     db.connect()
     logger.info("Database connected")
-
-    # Start job polling loop
     poll_task = asyncio.create_task(job_polling_loop())
-
     yield
-
-    # Graceful shutdown
     logger.info("Shutting down worker...")
     _shutdown_event.set()
     poll_task.cancel()
@@ -56,7 +42,6 @@ async def lifespan(app: FastAPI):
         await poll_task
     except asyncio.CancelledError:
         pass
-
     db.disconnect()
     logger.info("Worker shut down cleanly")
 
@@ -78,37 +63,32 @@ app.add_middleware(
 
 
 async def job_polling_loop():
-    """Poll for pending download jobs and process them"""
     while not _shutdown_event.is_set():
         try:
-            # Run synchronous DB call in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
             pending_job = await loop.run_in_executor(None, db.get_next_pending_job)
-
             if pending_job:
                 job_id = pending_job['id']
                 logger.info(f"Processing job #{job_id}")
                 try:
                     await downloader.process_job(job_id)
-                    logger.info(f"Job #{job_id} processing finished")
                 except Exception as e:
-                    logger.error(f"Job #{job_id} processing error: {e}")
-                    db.update_job_status(
-                        job_id, 'failed',
-                        error_message=str(e)
-                    )
+                    logger.error(f"Job #{job_id} error: {e}")
+                    db.update_job_status(job_id, 'failed', error_message=str(e))
             else:
-                await asyncio.sleep(10)  # Poll every 10 seconds
+                await asyncio.sleep(10)
         except asyncio.CancelledError:
             break
         except Exception as e:
-            logger.error(f"Job polling error: {e}")
+            logger.error(f"Polling error: {e}")
             await asyncio.sleep(30)
 
 
+# ================================================================
+# Health
+# ================================================================
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
     loop = asyncio.get_event_loop()
     db_ok = await loop.run_in_executor(None, db.check_connection)
     return {
@@ -119,30 +99,25 @@ async def health_check():
     }
 
 
+# ================================================================
+# Jobs
+# ================================================================
 @app.post("/jobs/{job_id}/trigger")
 async def trigger_job(job_id: int, background_tasks: BackgroundTasks):
-    """Manually trigger a specific download job"""
     loop = asyncio.get_event_loop()
     job = await loop.run_in_executor(None, db.get_job, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if job['status'] not in ('pending', 'failed'):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Job status is '{job['status']}', cannot trigger"
-        )
-
-    # Reset status if failed
+        raise HTTPException(status_code=400, detail=f"Job status is '{job['status']}'")
     if job['status'] == 'failed':
         db.update_job_status(job_id, 'pending', error_message=None)
-
     background_tasks.add_task(downloader.process_job, job_id)
     return {"message": f"Job #{job_id} triggered", "status": "processing"}
 
 
 @app.get("/jobs")
 async def list_jobs(limit: int = 20):
-    """List recent download jobs"""
     loop = asyncio.get_event_loop()
     jobs = await loop.run_in_executor(None, db.list_jobs, limit)
     return {"jobs": jobs}
@@ -150,7 +125,6 @@ async def list_jobs(limit: int = 20):
 
 @app.get("/jobs/{job_id}")
 async def get_job(job_id: int):
-    """Get a specific job with its download logs"""
     loop = asyncio.get_event_loop()
     job = await loop.run_in_executor(None, db.get_job, job_id)
     if not job:
@@ -159,59 +133,103 @@ async def get_job(job_id: int):
     return {"job": job, "logs": logs}
 
 
-@app.get("/files/{file_path:path}")
-async def download_file(file_path: str):
-    """Download a specific report file by its relative path"""
-    full_path = Path(DOWNLOAD_DIR) / file_path
-    if not full_path.exists() or not full_path.is_file():
-        raise HTTPException(status_code=404, detail="File not found")
+# ================================================================
+# Shared Filings (财报下载 - 所有用户共享, 存在PostgreSQL里)
+# ================================================================
+@app.get("/filings")
+async def list_filings(company_id: int = None):
+    """List all shared filings metadata (no content)"""
+    loop = asyncio.get_event_loop()
+    filings = await loop.run_in_executor(None, db.list_shared_filings, company_id)
+    return {"filings": filings, "total": len(filings)}
 
-    # Security: ensure path is within DOWNLOAD_DIR
-    try:
-        full_path.resolve().relative_to(Path(DOWNLOAD_DIR).resolve())
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Access denied")
 
-    media_type = "application/pdf" if full_path.suffix == '.pdf' else "text/html"
-    return FileResponse(
-        path=str(full_path),
-        filename=full_path.name,
-        media_type=media_type,
+@app.get("/filings/{filing_id}/download")
+async def download_filing(filing_id: int):
+    """Download a shared filing by ID"""
+    loop = asyncio.get_event_loop()
+    filing = await loop.run_in_executor(None, db.get_shared_filing_content, filing_id)
+    if not filing:
+        raise HTTPException(status_code=404, detail="Filing not found")
+
+    content = bytes(filing['file_content'])
+    return Response(
+        content=content,
+        media_type=filing.get('content_type', 'application/octet-stream'),
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{filing['filename']}\"",
+            "Content-Length": str(len(content)),
+        }
     )
 
 
-@app.get("/files")
-async def list_files(category: str = None, company: str = None):
-    """List all downloaded report files"""
-    base = Path(DOWNLOAD_DIR)
-    if not base.exists():
-        return {"files": [], "total": 0}
+# ================================================================
+# User Reports (用户研报上传 - 各人独立)
+# ================================================================
+@app.get("/reports")
+async def list_reports(company_id: int = None):
+    """List user-uploaded research reports"""
+    loop = asyncio.get_event_loop()
+    reports = await loop.run_in_executor(None, db.list_user_reports, company_id)
+    return {"reports": reports, "total": len(reports)}
 
-    files = []
-    for f in sorted(base.rglob("*"), reverse=True):
-        if not f.is_file():
-            continue
-        rel = str(f.relative_to(base))
-        parts = rel.split("/")
 
-        file_category = parts[0] if len(parts) > 1 else ""
-        file_company = parts[1] if len(parts) > 2 else ""
+@app.post("/reports/upload")
+async def upload_report(
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    uploader_name: str = Form(default="anonymous"),
+    company_id: int = Form(default=None),
+    year: int = Form(default=None),
+    quarter: str = Form(default=None),
+    description: str = Form(default=""),
+):
+    """Upload a user research report"""
+    content = await file.read()
+    if len(content) > 50 * 1024 * 1024:  # 50MB limit
+        raise HTTPException(status_code=413, detail="File too large (max 50MB)")
 
-        if category and file_category != category:
-            continue
-        if company and company.lower() not in file_company.lower():
-            continue
+    report_id = db.save_user_report(
+        title=title,
+        filename=file.filename or "report.pdf",
+        content_type=file.content_type or "application/octet-stream",
+        file_content=content,
+        uploader_name=uploader_name,
+        company_id=company_id if company_id else None,
+        year=year if year else None,
+        quarter=quarter if quarter else None,
+        description=description,
+    )
+    return {"id": report_id, "message": "Report uploaded successfully"}
 
-        files.append({
-            "path": rel,
-            "filename": f.name,
-            "category": file_category,
-            "company": file_company,
-            "size": f.stat().st_size,
-            "modified": f.stat().st_mtime,
-        })
 
-    return {"files": files, "total": len(files)}
+@app.get("/reports/{report_id}/download")
+async def download_report(report_id: int):
+    """Download a user research report"""
+    loop = asyncio.get_event_loop()
+    report = await loop.run_in_executor(None, db.get_user_report, report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    content = bytes(report['file_content'])
+    return Response(
+        content=content,
+        media_type=report.get('content_type', 'application/octet-stream'),
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{report['filename']}\"",
+            "Content-Length": str(len(content)),
+        }
+    )
+
+
+@app.delete("/reports/{report_id}")
+async def delete_report(report_id: int):
+    """Delete a user research report"""
+    loop = asyncio.get_event_loop()
+    ok = await loop.run_in_executor(None, db.delete_user_report, report_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"message": "Report deleted"}
 
 
 if __name__ == "__main__":

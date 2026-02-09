@@ -1,42 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
-const WORKER_URL = process.env.WORKER_API_URL || 'http://localhost:8000';
-
-// GET: Proxy file download from worker
+// GET /api/files/filing/{id} — Download a shared filing from DB
+// GET /api/files/report/{id} — Download a user report from DB
 export async function GET(
   req: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
   try {
-    const filePath = params.path.join('/');
+    const [type, id] = params.path;
 
-    const res = await fetch(`${WORKER_URL}/files/${filePath}`, {
-      signal: AbortSignal.timeout(30000),
-    });
-
-    if (!res.ok) {
-      return NextResponse.json(
-        { success: false, error: 'File not found' },
-        { status: res.status }
-      );
+    if (!type || !id) {
+      return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }
 
-    const contentType = res.headers.get('content-type') || 'application/octet-stream';
-    const filename = filePath.split('/').pop() || 'report';
+    const numId = parseInt(id);
+    if (isNaN(numId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
 
-    const body = await res.arrayBuffer();
+    let table: string;
+    if (type === 'filing') {
+      table = 'shared_filings';
+    } else if (type === 'report') {
+      table = 'user_reports';
+    } else {
+      return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
+    }
 
-    return new NextResponse(body, {
+    const result = await query(
+      `SELECT filename, content_type, file_content FROM ${table} WHERE id = $1`,
+      [numId]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
+
+    const row = result.rows[0] as Record<string, any>;
+    const content = row.file_content as Buffer;
+    const filename = row.filename as string;
+    const contentType = row.content_type as string || 'application/octet-stream';
+
+    return new NextResponse(content, {
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': String(body.byteLength),
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+        'Content-Length': String(content.length),
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: String(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }

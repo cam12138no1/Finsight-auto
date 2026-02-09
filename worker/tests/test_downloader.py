@@ -393,6 +393,8 @@ class TestRetryLogic(unittest.TestCase):
     def setUp(self):
         self.db = MagicMock()
         self.db.create_download_log.return_value = 1
+        # No existing filing in DB (important: disables dedup skip)
+        self.db.get_shared_filing.return_value = None
         self.downloader = EarningsDownloader(self.db)
 
     def test_retry_on_network_error(self):
@@ -409,11 +411,8 @@ class TestRetryLogic(unittest.TestCase):
             self.downloader._rate_limiter = asyncio.Lock()
             self.downloader._last_request_time = 0
 
-            # All search methods fail, so "no filing found" should happen
-            # (not retryable)
             await self.downloader._download_filing_with_retry(mock_client, task)
 
-            # Should have created a log with 'failed' status
             self.db.update_download_log.assert_called()
             self.db.increment_job_counter.assert_called_with(1, 'failed_files')
 
@@ -434,12 +433,36 @@ class TestRetryLogic(unittest.TestCase):
             self.downloader._last_request_time = 0
             await self.downloader._download_filing_with_retry(mock_client, task)
 
-            # Should log as failed only once (no retries for "not found")
             failed_calls = [
                 c for c in self.db.update_download_log.call_args_list
                 if any(v == 'failed' for v in c[1].values() if isinstance(v, str))
             ]
             self.assertEqual(len(failed_calls), 1)
+
+        run_async(test())
+
+    def test_dedup_skips_existing_filing(self):
+        """Test that existing filing in DB is skipped (not re-downloaded)"""
+        self.db.get_shared_filing.return_value = {
+            'id': 99, 'filename': '2024_Q1_MSFT.htm', 'file_size': 1000, 'file_url': ''
+        }
+        task = DownloadTask(
+            job_id=1,
+            company={'id': 1, 'ticker': 'MSFT', 'sec_cik': '0000789019', 'ir_url': ''},
+            year=2024,
+            quarter='Q1',
+        )
+
+        async def test():
+            mock_client = AsyncMock()
+            self.downloader._rate_limiter = asyncio.Lock()
+            self.downloader._last_request_time = 0
+            await self.downloader._download_filing_with_retry(mock_client, task)
+
+            # Should skip and mark as success without downloading
+            self.db.increment_job_counter.assert_called_with(1, 'completed_files')
+            # Should NOT have made any HTTP requests
+            mock_client.get.assert_not_called()
 
         run_async(test())
 

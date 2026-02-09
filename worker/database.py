@@ -1,7 +1,6 @@
 """
 Database connection and query utilities for the worker.
-Uses synchronous psycopg2 but exposes sync methods (no misleading async).
-Thread-safe with connection pooling via psycopg2.pool.
+Synchronous psycopg2 with ThreadedConnectionPool.
 """
 
 import os
@@ -24,28 +23,23 @@ class Database:
         self.database_url = os.environ.get('DATABASE_URL', '')
 
     def connect(self):
-        """Establish database connection pool"""
         try:
             self._pool = psycopg2.pool.ThreadedConnectionPool(
-                minconn=1,
-                maxconn=5,
+                minconn=1, maxconn=5,
                 dsn=self.database_url,
                 cursor_factory=psycopg2.extras.RealDictCursor,
             )
-            logger.info("Database connection pool created successfully")
+            logger.info("Database pool created")
         except Exception as e:
-            logger.error(f"Database connection failed: {e}")
+            logger.error(f"DB connection failed: {e}")
             raise
 
     def disconnect(self):
-        """Close all connections in pool"""
         if self._pool:
             self._pool.closeall()
-            logger.info("Database pool closed")
 
     @contextmanager
     def _get_conn(self):
-        """Get a connection from the pool"""
         conn = self._pool.getconn()
         conn.autocommit = True
         try:
@@ -54,7 +48,6 @@ class Database:
             self._pool.putconn(conn)
 
     def check_connection(self) -> bool:
-        """Check if database is reachable"""
         try:
             with self._get_conn() as conn:
                 with conn.cursor() as cur:
@@ -64,7 +57,6 @@ class Database:
             return False
 
     def _execute(self, sql: str, params: tuple = None) -> List[Dict[str, Any]]:
-        """Execute a query and return results"""
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, params)
@@ -73,12 +65,10 @@ class Database:
                 return []
 
     def _execute_one(self, sql: str, params: tuple = None) -> Optional[Dict[str, Any]]:
-        """Execute a query and return first result"""
         results = self._execute(sql, params)
         return results[0] if results else None
 
     def _execute_update(self, sql: str, params: tuple = None) -> int:
-        """Execute an update/insert and return affected rows"""
         with self._get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, params)
@@ -88,73 +78,57 @@ class Database:
     # Job operations
     # ----------------------------------------------------------------
     def get_next_pending_job(self) -> Optional[Dict]:
-        """Get the next pending download job (oldest first)"""
         return self._execute_one(
             "SELECT * FROM download_jobs WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
         )
 
     def get_job(self, job_id: int) -> Optional[Dict]:
-        """Get a specific job"""
         return self._execute_one("SELECT * FROM download_jobs WHERE id = %s", (job_id,))
 
     def list_jobs(self, limit: int = 20) -> List[Dict]:
-        """List recent jobs"""
         return self._execute(
             "SELECT * FROM download_jobs ORDER BY created_at DESC LIMIT %s", (limit,)
         )
 
     def update_job_status(self, job_id: int, status: str, **kwargs):
-        """Update job status and metadata"""
         sets = ["status = %s"]
         params: list = [status]
-
         for key, value in kwargs.items():
             sets.append(f"{key} = %s")
             params.append(value)
-
         params.append(job_id)
-        sql = f"UPDATE download_jobs SET {', '.join(sets)} WHERE id = %s"
-        self._execute_update(sql, tuple(params))
+        self._execute_update(f"UPDATE download_jobs SET {', '.join(sets)} WHERE id = %s", tuple(params))
 
     def increment_job_counter(self, job_id: int, field: str):
-        """Increment a job counter (completed_files or failed_files)"""
         allowed = {'completed_files', 'failed_files'}
         if field not in allowed:
             raise ValueError(f"Invalid counter field: {field}")
         self._execute_update(
-            f"UPDATE download_jobs SET {field} = {field} + 1 WHERE id = %s",
-            (job_id,)
+            f"UPDATE download_jobs SET {field} = {field} + 1 WHERE id = %s", (job_id,)
         )
 
     # ----------------------------------------------------------------
     # Company operations
     # ----------------------------------------------------------------
     def get_companies(self, ids: List[int] = None, category: str = None) -> List[Dict]:
-        """Get companies with optional filters"""
         sql = "SELECT * FROM companies WHERE is_active = true"
         params = []
-
         if ids:
             sql += " AND id = ANY(%s)"
             params.append(ids)
         if category:
             sql += " AND category = %s"
             params.append(category)
-
         sql += " ORDER BY category, name"
         return self._execute(sql, tuple(params) if params else None)
 
     def get_all_companies(self) -> List[Dict]:
-        """Get all active companies"""
-        return self._execute(
-            "SELECT * FROM companies WHERE is_active = true ORDER BY category, name"
-        )
+        return self._execute("SELECT * FROM companies WHERE is_active = true ORDER BY category, name")
 
     # ----------------------------------------------------------------
     # Download log operations
     # ----------------------------------------------------------------
     def create_download_log(self, job_id: int, company_id: int, year: int, quarter: str) -> int:
-        """Create a download log entry"""
         result = self._execute_one(
             """INSERT INTO download_logs (job_id, company_id, year, quarter, status)
                VALUES (%s, %s, %s, %s, 'pending') RETURNING id""",
@@ -163,21 +137,16 @@ class Database:
         return result['id'] if result else 0
 
     def update_download_log(self, log_id: int, **kwargs):
-        """Update a download log entry"""
         sets = []
         params = []
-
         for key, value in kwargs.items():
             sets.append(f"{key} = %s")
             params.append(value)
-
         sets.append("updated_at = NOW()")
         params.append(log_id)
-        sql = f"UPDATE download_logs SET {', '.join(sets)} WHERE id = %s"
-        self._execute_update(sql, tuple(params))
+        self._execute_update(f"UPDATE download_logs SET {', '.join(sets)} WHERE id = %s", tuple(params))
 
     def get_download_logs(self, job_id: int) -> List[Dict]:
-        """Get all download logs for a job"""
         return self._execute(
             """SELECT dl.*, c.name as company_name, c.ticker as company_ticker
                FROM download_logs dl
@@ -185,3 +154,106 @@ class Database:
                WHERE dl.job_id = %s ORDER BY dl.created_at""",
             (job_id,)
         )
+
+    # ----------------------------------------------------------------
+    # Shared filings (财报永久存储, 所有用户共享, 按公司/年/季度去重)
+    # ----------------------------------------------------------------
+    def get_shared_filing(self, company_id: int, year: int, quarter: str) -> Optional[Dict]:
+        """Check if a filing already exists (without loading content)"""
+        return self._execute_one(
+            """SELECT id, company_id, year, quarter, filename, file_url, content_type, file_size, created_at
+               FROM shared_filings WHERE company_id = %s AND year = %s AND quarter = %s""",
+            (company_id, year, quarter)
+        )
+
+    def save_shared_filing(
+        self, company_id: int, year: int, quarter: str,
+        filename: str, file_url: str, content_type: str,
+        file_content: bytes, source: str = 'sec_edgar'
+    ) -> int:
+        """Save a filing. If already exists for this company/year/quarter, skip (return existing id)."""
+        existing = self.get_shared_filing(company_id, year, quarter)
+        if existing:
+            logger.info(f"Filing already exists: company={company_id} {year} {quarter}, skipping")
+            return existing['id']
+
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO shared_filings
+                       (company_id, year, quarter, filename, file_url, content_type, file_size, file_content, source)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       ON CONFLICT (company_id, year, quarter) DO NOTHING
+                       RETURNING id""",
+                    (company_id, year, quarter, filename, file_url, content_type,
+                     len(file_content), psycopg2.Binary(file_content), source)
+                )
+                row = cur.fetchone()
+                return row['id'] if row else 0
+
+    def get_shared_filing_content(self, filing_id: int) -> Optional[Dict]:
+        """Get filing with content for download"""
+        return self._execute_one(
+            "SELECT * FROM shared_filings WHERE id = %s", (filing_id,)
+        )
+
+    def get_shared_filing_by_key(self, company_id: int, year: int, quarter: str) -> Optional[Dict]:
+        """Get filing content by company/year/quarter"""
+        return self._execute_one(
+            "SELECT * FROM shared_filings WHERE company_id = %s AND year = %s AND quarter = %s",
+            (company_id, year, quarter)
+        )
+
+    def list_shared_filings(self, company_id: int = None) -> List[Dict]:
+        """List filings metadata (no content)"""
+        sql = """SELECT sf.id, sf.company_id, sf.year, sf.quarter, sf.filename,
+                        sf.file_url, sf.content_type, sf.file_size, sf.source, sf.created_at,
+                        c.name as company_name, c.ticker as company_ticker, c.category
+                 FROM shared_filings sf
+                 LEFT JOIN companies c ON sf.company_id = c.id"""
+        params = []
+        if company_id:
+            sql += " WHERE sf.company_id = %s"
+            params.append(company_id)
+        sql += " ORDER BY sf.year DESC, sf.quarter, c.name"
+        return self._execute(sql, tuple(params) if params else None)
+
+    # ----------------------------------------------------------------
+    # User reports (用户研报, 各自上传)
+    # ----------------------------------------------------------------
+    def save_user_report(
+        self, title: str, filename: str, content_type: str,
+        file_content: bytes, uploader_name: str = 'anonymous',
+        company_id: int = None, year: int = None, quarter: str = None,
+        description: str = ''
+    ) -> int:
+        with self._get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO user_reports
+                       (uploader_name, company_id, title, description, year, quarter,
+                        filename, content_type, file_size, file_content)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       RETURNING id""",
+                    (uploader_name, company_id, title, description, year, quarter,
+                     filename, content_type, len(file_content), psycopg2.Binary(file_content))
+                )
+                row = cur.fetchone()
+                return row['id'] if row else 0
+
+    def get_user_report(self, report_id: int) -> Optional[Dict]:
+        return self._execute_one("SELECT * FROM user_reports WHERE id = %s", (report_id,))
+
+    def list_user_reports(self, company_id: int = None) -> List[Dict]:
+        sql = """SELECT id, uploader_name, company_id, title, description,
+                        year, quarter, filename, content_type, file_size, created_at
+                 FROM user_reports"""
+        params = []
+        if company_id:
+            sql += " WHERE company_id = %s"
+            params.append(company_id)
+        sql += " ORDER BY created_at DESC"
+        return self._execute(sql, tuple(params) if params else None)
+
+    def delete_user_report(self, report_id: int) -> bool:
+        return self._execute_update("DELETE FROM user_reports WHERE id = %s", (report_id,)) > 0

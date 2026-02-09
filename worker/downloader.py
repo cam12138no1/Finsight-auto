@@ -5,14 +5,12 @@ Supports concurrent downloads, retry with backoff, and content validation.
 """
 
 import re
-import os
 import asyncio
 import time
 import logging
 from typing import Optional, List, Dict, Tuple
 from datetime import datetime
 from dataclasses import dataclass
-from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
@@ -43,14 +41,6 @@ MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2.0  # seconds, exponential backoff
 RATE_LIMIT_DELAY = 1.2  # seconds between requests (SEC EDGAR asks for 10 req/s max)
 REQUEST_TIMEOUT = 30
-
-# File storage directory
-DOWNLOAD_DIR = os.environ.get('DOWNLOAD_DIR', '/tmp/finsight_reports')
-
-CATEGORY_DIR_MAP = {
-    'AI_Applications': 'AI_Applications',
-    'AI_Supply_Chain': 'AI_Supply_Chain',
-}
 
 
 @dataclass
@@ -173,12 +163,31 @@ class EarningsDownloader:
     async def _download_filing_with_retry(
         self, client: httpx.AsyncClient, task: DownloadTask
     ):
-        """Download a single filing with retry logic"""
+        """Download a single filing with retry logic.
+        Saves to shared_filings table in PostgreSQL (permanent, shared across all users).
+        Skips download if filing already exists in DB.
+        """
         company = task.company
         ticker = company['ticker']
+        company_id = company['id']
         log_id = self.db.create_download_log(
-            task.job_id, company['id'], task.year, task.quarter
+            task.job_id, company_id, task.year, task.quarter
         )
+
+        # Check if this filing already exists in DB (去重: 不重复下载)
+        existing = self.db.get_shared_filing(company_id, task.year, task.quarter)
+        if existing:
+            self.db.update_download_log(
+                log_id,
+                status='success',
+                filename=existing['filename'],
+                file_url=existing.get('file_url', ''),
+                file_size=existing['file_size'],
+                download_duration_ms=0,
+            )
+            self.db.increment_job_counter(task.job_id, 'completed_files')
+            logger.info(f"Skipped (already in DB): {ticker} {task.year} {task.quarter}")
+            return
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
@@ -198,7 +207,6 @@ class EarningsDownloader:
                     )
 
                 if not filing_url:
-                    # No filing found - not a retriable error
                     self.db.update_download_log(
                         log_id,
                         status='failed',
@@ -215,25 +223,32 @@ class EarningsDownloader:
                 content = response.content
                 file_size = len(content)
 
-                # Validate content - ensure it's not an HTML error page
+                # Validate content
                 if not self._validate_content(content, filing_url):
-                    raise ValueError("Downloaded content appears to be HTML error page, not a valid document")
+                    raise ValueError("Downloaded content appears to be error page, not a valid document")
 
                 filename = f"{task.year}_{task.quarter}_{ticker}"
-                # Determine extension from URL or content type
                 content_type = response.headers.get('content-type', '')
                 if 'pdf' in content_type or filing_url.lower().endswith('.pdf'):
                     filename += '.pdf'
+                    content_type = 'application/pdf'
                 elif 'html' in content_type or filing_url.lower().endswith('.htm'):
                     filename += '.htm'
+                    content_type = 'text/html'
                 else:
                     filename += '.pdf'
+                    content_type = 'application/pdf'
 
-                # Save file to disk
-                file_path = self._save_file(
-                    content, filename,
-                    company.get('category', 'Other'),
-                    company.get('name', ticker),
+                # Save to PostgreSQL (永久存储, 所有用户共享)
+                self.db.save_shared_filing(
+                    company_id=company_id,
+                    year=task.year,
+                    quarter=task.quarter,
+                    filename=filename,
+                    file_url=filing_url,
+                    content_type=content_type,
+                    file_content=content,
+                    source='sec_edgar' if 'sec.gov' in filing_url else 'ir_page',
                 )
 
                 duration_ms = int((time.time() - start_time) * 1000)
@@ -244,12 +259,11 @@ class EarningsDownloader:
                     filename=filename,
                     file_url=filing_url,
                     file_size=file_size,
-                    file_path=file_path,
                     download_duration_ms=duration_ms,
                 )
                 self.db.increment_job_counter(task.job_id, 'completed_files')
-                logger.info(f"Saved: {file_path} ({file_size / 1024:.1f} KB) [attempt {attempt}]")
-                return  # Success
+                logger.info(f"Saved to DB: {filename} ({file_size / 1024:.1f} KB) [attempt {attempt}]")
+                return
 
             except Exception as e:
                 logger.warning(
@@ -258,35 +272,15 @@ class EarningsDownloader:
                 )
                 if attempt < MAX_RETRIES:
                     delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))
-                    logger.info(f"Retrying in {delay:.1f}s...")
                     await asyncio.sleep(delay)
                 else:
-                    # All retries exhausted
                     self.db.update_download_log(
                         log_id,
                         status='failed',
                         error_message=f'Failed after {MAX_RETRIES} attempts: {str(e)}'
                     )
                     self.db.increment_job_counter(task.job_id, 'failed_files')
-                    logger.error(
-                        f"Download failed permanently for "
-                        f"{ticker} {task.year} {task.quarter}: {e}"
-                    )
-
-    def _save_file(
-        self, content: bytes, filename: str, category: str, company_name: str
-    ) -> str:
-        """Save downloaded file to disk. Returns the relative file path."""
-        cat_dir = CATEGORY_DIR_MAP.get(category, 'Other')
-        # Sanitize company name for directory
-        safe_name = re.sub(r'[^\w\s-]', '', company_name).strip().replace(' ', '_')
-        dir_path = Path(DOWNLOAD_DIR) / cat_dir / safe_name
-        dir_path.mkdir(parents=True, exist_ok=True)
-
-        file_path = dir_path / filename
-        file_path.write_bytes(content)
-        # Return path relative to DOWNLOAD_DIR for the API
-        return str(file_path.relative_to(DOWNLOAD_DIR))
+                    logger.error(f"Download failed: {ticker} {task.year} {task.quarter}: {e}")
 
     def _validate_content(self, content: bytes, url: str) -> bool:
         """Validate that downloaded content is a real document, not an error page.

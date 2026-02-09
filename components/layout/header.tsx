@@ -11,6 +11,7 @@ const pageTitles: Record<string, { title: string; description: string }> = {
   '/companies': { title: '公司管理', description: '管理 AI 行业上市公司' },
   '/downloads': { title: '下载中心', description: '创建和管理财报下载任务' },
   '/downloads/new': { title: '新建下载', description: '配置并启动财报下载任务' },
+  '/reports': { title: '财报/研报', description: '共享财报下载与个人研报上传' },
   '/history': { title: '历史记录', description: '查看下载历史与日志' },
   '/settings': { title: '设置', description: '系统配置与偏好设置' },
 };
