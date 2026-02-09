@@ -9,8 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "db:migrate": "node scripts/migrate.js",
-    "db:seed": "node scripts/seed.js"
+    "db:migrate": "node scripts/migrate.js"
   },
   "dependencies": {
     "@ai-sdk/openai": "^0.0.66",
