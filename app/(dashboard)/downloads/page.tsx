@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
   Plus, Download, Clock, CheckCircle2, XCircle,
-  Loader2, ArrowRight, FileText, Calendar, Trash2, RefreshCw
+  Loader2, FileText, Calendar, Trash2, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DownloadJob, JobStatus } from '@/types';
@@ -34,74 +34,68 @@ function JobCard({
 
   return (
     <div className="group p-4 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-muted/30 transition-all duration-200">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className={cn('p-2 rounded-lg', `${config.color} bg-current/10`)}>
-              <StatusIcon className={cn('w-4 h-4', config.color, job.status === 'running' && 'animate-spin')} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">下载任务 #{job.id}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {new Date(job.created_at).toLocaleString('zh-CN')}
-              </p>
-            </div>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className={cn('p-2 rounded-lg', `${config.color} bg-current/10`)}>
+            <StatusIcon className={cn('w-4 h-4', config.color, job.status === 'running' && 'animate-spin')} />
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={config.badge} className="text-[10px]">{config.label}</Badge>
-            {(job.status === 'pending' || job.status === 'running') && (
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onCancel(job.id);
-                }}
-                className="p-1 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
-                title="取消任务"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
+          <div>
+            <p className="text-sm font-semibold">下载任务 #{job.id}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {new Date(job.created_at).toLocaleString('zh-CN')}
+            </p>
           </div>
         </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Calendar className="w-3 h-3" />
-            <span>{job.years?.join(', ')}</span>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <FileText className="w-3 h-3" />
-            <span>{job.quarters?.join(', ')}</span>
-          </div>
-        </div>
-
-        {/* Progress */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">
-              {job.completed_files + job.failed_files} / {job.total_files} 文件
-            </span>
-            <span className="font-mono font-medium">{progress}%</span>
-          </div>
-          <Progress value={progress} className="h-1.5" />
-        </div>
-
-        {/* Stats */}
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {job.completed_files} 成功
-          </span>
-          <span className="flex items-center gap-1">
-            <XCircle className="w-3 h-3 text-red-500" /> {job.failed_files} 失败
-          </span>
-          {job.error_message && (
-            <span className="text-red-400 truncate ml-auto max-w-[200px]" title={job.error_message}>
-              {job.error_message}
-            </span>
+        <div className="flex items-center gap-2">
+          <Badge variant={config.badge} className="text-[10px]">{config.label}</Badge>
+          {(job.status === 'pending' || job.status === 'running') && (
+            <button
+              onClick={() => onCancel(job.id)}
+              className="p-1 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+              title="取消任务"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           )}
-          <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Calendar className="w-3 h-3" />
+          <span>{job.years?.join(', ')}</span>
+        </div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <FileText className="w-3 h-3" />
+          <span>{job.quarters?.join(', ')}</span>
+        </div>
+      </div>
+
+      {/* Progress */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">
+            {job.completed_files + job.failed_files} / {job.total_files} 文件
+          </span>
+          <span className="font-mono font-medium">{progress}%</span>
+        </div>
+        <Progress value={progress} className="h-1.5" />
+      </div>
+
+      {/* Stats */}
+      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {job.completed_files} 成功
+        </span>
+        <span className="flex items-center gap-1">
+          <XCircle className="w-3 h-3 text-red-500" /> {job.failed_files} 失败
+        </span>
+        {job.error_message && (
+          <span className="text-red-400 truncate ml-auto max-w-[200px]" title={job.error_message}>
+            {job.error_message}
+          </span>
+        )}
       </div>
     </div>
   );
