@@ -1,7 +1,7 @@
 # Finsight Auto - 待办事项 (TODO)
 
-> 更新日期: 2026-02-08
-> 上次开发内容: 全功能实现 + 单元测试 + SEC EDGAR 爬取验证
+> 更新日期: 2026-02-09
+> 上次开发内容: 修复内容验证误判 + 文件存储到服务器磁盘 + 文件下载API
 
 ---
 
@@ -19,8 +19,11 @@
 - [x] 并发下载：`asyncio.Semaphore(3)` 控制并发
 - [x] 重试机制：3 次重试 + 指数退避 (2s, 4s, 8s)
 - [x] 速率限制：异步锁实现 1.2s 请求间隔
-- [x] 内容验证：PDF 魔数、文件大小检测、HTML 错误页检测
+- [x] 内容验证：PDF 魔数、文件大小检测、HTML 错误页检测（已修复 UUID 误报）
 - [x] 优雅关闭：Worker 支持 graceful shutdown
+- [x] 文件存储：下载后保存到 Render 服务器磁盘 (`/tmp/finsight_reports/`)
+- [x] 文件下载 API：`GET /files/{path}` 提供文件下载、`GET /files` 列出所有文件
+- [x] Next.js 文件代理：`/api/files/` 将前端请求代理到 Worker 文件下载
 
 ### 前端功能
 - [x] 下载中心 (`downloads/page.tsx`) 接入 API，支持状态筛选、5s 自动刷新、取消任务
@@ -50,19 +53,21 @@
 
 ### 高优先级
 
+- [ ] **Render 持久化存储**
+  - 当前文件存储在 `/tmp/finsight_reports/`，Render 重部署会丢失
+  - 方案 A：挂载 Render Persistent Disk（推荐，$0.25/GB/月）
+  - 方案 B：上传到 S3/GCS 等对象存储
+  - 方案 C：存储到 PostgreSQL 的 `bytea` 字段（小文件适用）
+
 - [ ] **重新运行全量覆盖验证**
-  - 已修复 CIK + 20-F/6-K 支持 + 季度匹配算法，但尚未重新跑完整矩阵验证
+  - 已修复 CIK + 20-F/6-K 支持 + 内容验证 + 季度匹配算法
   - 运行 `cd worker && python -m pytest tests/test_full_coverage.py -v -s`
   - 目标：命中率从 72.7% 提升到 85%+
 
-- [ ] **AppLovin (APP) 特殊处理**
-  - CIK `0001751008` 的 recent filings 只有 `4` 和 `144` 表单（内部人交易）
-  - 10-Q/10-K 可能在 `filings.files` 的额外文件中，需要加载分页数据
-  - 参考: `https://data.sec.gov/submissions/CIK0001751008.json` 中 `filings.files` 字段
-
-- [ ] **Broadcom (AVGO) 验证**
-  - 新 CIK `0001730168` 的 recent filings 也只有少量 10-K
-  - 同样可能需要加载 `filings.files` 中的额外分页数据
+- [ ] **AppLovin (APP) / Broadcom (AVGO) EDGAR 分页数据**
+  - 这两家的 10-Q/10-K 不在 `filings.recent` 中，在 `filings.files` 引用的额外 JSON 里
+  - 需要在 `_search_edgar` 中加载 `CIK{cik}-submissions-001.json` 等分页文件
+  - AppLovin CIK: `0001751008`, Broadcom CIK: `0001730168`
 
 - [ ] **SK Hynix / Samsung IR 页面爬取**
   - 无 SEC CIK（韩国上市），完全依赖 IR 页面
@@ -71,16 +76,6 @@
   - 可能需要特殊适配这两个页面的 HTML 结构
 
 ### 中优先级
-
-- [ ] **EDGAR `filings.files` 分页加载**
-  - 部分公司的 10-Q/10-K 不在 `recent` 中，而是在 `filings.files` 数组引用的额外 JSON 文件中
-  - 需要在 `_search_edgar` 中添加：如果 `recent` 中找不到，遍历 `filings.files` 加载更多数据
-  - 参考格式: `https://data.sec.gov/submissions/CIK{cik}-submissions-001.json`
-
-- [ ] **下载文件实际存储**
-  - 当前只记录 URL 和元数据到数据库，不保存文件到磁盘
-  - 需要添加实际文件写入（本地或云存储）
-  - 需求文档要求的目录结构：`earnings_reports/AI_Applications/Microsoft/2024_Q1_MSFT.pdf`
 
 - [ ] **Next.js 前端测试**
   - 目前无前端组件测试或 API 路由测试

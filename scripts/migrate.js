@@ -52,6 +52,7 @@ const migrations = [
     quarter VARCHAR(10) NOT NULL,
     filename VARCHAR(500),
     file_url VARCHAR(1000),
+    file_path VARCHAR(1000),
     file_size BIGINT,
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'downloading', 'success', 'failed', 'skipped')),
     error_message TEXT,
@@ -59,6 +60,12 @@ const migrations = [
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
   )`,
+
+  // Migration: add file_path column if it doesn't exist
+  \`DO $$ BEGIN
+    ALTER TABLE download_logs ADD COLUMN IF NOT EXISTS file_path VARCHAR(1000);
+  EXCEPTION WHEN duplicate_column THEN NULL;
+  END $$\`,
 
   // Indexes
   `CREATE INDEX IF NOT EXISTS idx_download_jobs_status ON download_jobs(status)`,

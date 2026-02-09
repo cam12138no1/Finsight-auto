@@ -144,14 +144,23 @@ export default function HistoryPage() {
                             <Badge variant="secondary" className="text-[10px]">{log.quarter}</Badge>
                           </td>
                           <td className="px-4 py-3">
-                            {log.file_url ? (
+                            {(log as any).file_path ? (
+                              <a
+                                href={`/api/files/${(log as any).file_path}`}
+                                className="text-sm font-mono text-blue-400 hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+                                download
+                              >
+                                <Download className="w-3 h-3" />
+                                {log.filename || 'Download'}
+                              </a>
+                            ) : log.file_url ? (
                               <a
                                 href={log.file_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-sm font-mono text-blue-400 hover:text-blue-300 hover:underline"
                               >
-                                {log.filename || 'Link'}
+                                {log.filename || 'SEC Link'}
                               </a>
                             ) : (
                               <span className="text-sm font-mono text-muted-foreground">

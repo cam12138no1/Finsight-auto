@@ -5,12 +5,14 @@ Supports concurrent downloads, retry with backoff, and content validation.
 """
 
 import re
+import os
 import asyncio
 import time
 import logging
 from typing import Optional, List, Dict, Tuple
 from datetime import datetime
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
@@ -41,6 +43,14 @@ MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2.0  # seconds, exponential backoff
 RATE_LIMIT_DELAY = 1.2  # seconds between requests (SEC EDGAR asks for 10 req/s max)
 REQUEST_TIMEOUT = 30
+
+# File storage directory
+DOWNLOAD_DIR = os.environ.get('DOWNLOAD_DIR', '/tmp/finsight_reports')
+
+CATEGORY_DIR_MAP = {
+    'AI_Applications': 'AI_Applications',
+    'AI_Supply_Chain': 'AI_Supply_Chain',
+}
 
 
 @dataclass
@@ -219,6 +229,13 @@ class EarningsDownloader:
                 else:
                     filename += '.pdf'
 
+                # Save file to disk
+                file_path = self._save_file(
+                    content, filename,
+                    company.get('category', 'Other'),
+                    company.get('name', ticker),
+                )
+
                 duration_ms = int((time.time() - start_time) * 1000)
 
                 self.db.update_download_log(
@@ -227,10 +244,11 @@ class EarningsDownloader:
                     filename=filename,
                     file_url=filing_url,
                     file_size=file_size,
+                    file_path=file_path,
                     download_duration_ms=duration_ms,
                 )
                 self.db.increment_job_counter(task.job_id, 'completed_files')
-                logger.info(f"Downloaded: {filename} ({file_size / 1024:.1f} KB) [attempt {attempt}]")
+                logger.info(f"Saved: {file_path} ({file_size / 1024:.1f} KB) [attempt {attempt}]")
                 return  # Success
 
             except Exception as e:
@@ -255,8 +273,26 @@ class EarningsDownloader:
                         f"{ticker} {task.year} {task.quarter}: {e}"
                     )
 
+    def _save_file(
+        self, content: bytes, filename: str, category: str, company_name: str
+    ) -> str:
+        """Save downloaded file to disk. Returns the relative file path."""
+        cat_dir = CATEGORY_DIR_MAP.get(category, 'Other')
+        # Sanitize company name for directory
+        safe_name = re.sub(r'[^\w\s-]', '', company_name).strip().replace(' ', '_')
+        dir_path = Path(DOWNLOAD_DIR) / cat_dir / safe_name
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+        file_path = dir_path / filename
+        file_path.write_bytes(content)
+        # Return path relative to DOWNLOAD_DIR for the API
+        return str(file_path.relative_to(DOWNLOAD_DIR))
+
     def _validate_content(self, content: bytes, url: str) -> bool:
-        """Validate that downloaded content is a real document, not an error page"""
+        """Validate that downloaded content is a real document, not an error page.
+        SEC HTML filings (10-Q/10-K) are large HTML files with embedded XBRL.
+        We must avoid false positives from UUIDs or data that contain '404' etc.
+        """
         if len(content) < 500:
             return False  # Too small to be a real filing
 
@@ -268,12 +304,27 @@ class EarningsDownloader:
         if url.lower().endswith('.pdf') and content[:5] != b'%PDF-':
             return False
 
-        # For HTML filings (10-K/10-Q), check it's not a generic error
+        # Large files (>50KB) are almost certainly real filings, not error pages
+        if len(content) > 50_000:
+            return True
+
+        # For smaller HTML files, check it's not a generic error page
         text_start = content[:2000].decode('utf-8', errors='ignore').lower()
-        error_indicators = ['page not found', '404', 'access denied', 'forbidden', 'error']
-        if any(indicator in text_start for indicator in error_indicators):
-            if '<html' in text_start:
-                return False
+
+        # Look for definitive error page patterns (full phrases, not substrings)
+        error_patterns = [
+            'page not found',
+            'access denied',
+            '403 forbidden',
+            '404 not found',
+            '<title>error</title>',
+            '<title>404</title>',
+            '<title>403</title>',
+            'the page you requested',
+            'this page is not available',
+        ]
+        if any(pattern in text_start for pattern in error_patterns):
+            return False
 
         return True
 

@@ -8,9 +8,12 @@ import os
 import asyncio
 import signal
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import Database
@@ -24,6 +27,10 @@ logger = logging.getLogger('finsight-worker')
 
 db = Database()
 downloader = EarningsDownloader(db)
+
+# File storage directory
+DOWNLOAD_DIR = os.environ.get('DOWNLOAD_DIR', '/tmp/finsight_reports')
+Path(DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
 # Graceful shutdown flag
 _shutdown_event = asyncio.Event()
@@ -150,6 +157,61 @@ async def get_job(job_id: int):
         raise HTTPException(status_code=404, detail="Job not found")
     logs = await loop.run_in_executor(None, db.get_download_logs, job_id)
     return {"job": job, "logs": logs}
+
+
+@app.get("/files/{file_path:path}")
+async def download_file(file_path: str):
+    """Download a specific report file by its relative path"""
+    full_path = Path(DOWNLOAD_DIR) / file_path
+    if not full_path.exists() or not full_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Security: ensure path is within DOWNLOAD_DIR
+    try:
+        full_path.resolve().relative_to(Path(DOWNLOAD_DIR).resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    media_type = "application/pdf" if full_path.suffix == '.pdf' else "text/html"
+    return FileResponse(
+        path=str(full_path),
+        filename=full_path.name,
+        media_type=media_type,
+    )
+
+
+@app.get("/files")
+async def list_files(category: str = None, company: str = None):
+    """List all downloaded report files"""
+    base = Path(DOWNLOAD_DIR)
+    if not base.exists():
+        return {"files": [], "total": 0}
+
+    files = []
+    for f in sorted(base.rglob("*"), reverse=True):
+        if not f.is_file():
+            continue
+        rel = str(f.relative_to(base))
+        parts = rel.split("/")
+
+        file_category = parts[0] if len(parts) > 1 else ""
+        file_company = parts[1] if len(parts) > 2 else ""
+
+        if category and file_category != category:
+            continue
+        if company and company.lower() not in file_company.lower():
+            continue
+
+        files.append({
+            "path": rel,
+            "filename": f.name,
+            "category": file_category,
+            "company": file_company,
+            "size": f.stat().st_size,
+            "modified": f.stat().st_mtime,
+        })
+
+    return {"files": files, "total": len(files)}
 
 
 if __name__ == "__main__":
