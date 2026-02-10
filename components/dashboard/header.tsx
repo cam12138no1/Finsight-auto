@@ -1,6 +1,5 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
 import { Bell, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -12,28 +11,26 @@ interface HeaderProps {
 }
 
 export default function Header({ user }: HeaderProps) {
-  const t = useTranslations()
-
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+    <header className="h-14 bg-card/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-6">
       <div className="flex items-center space-x-4">
-        <h2 className="text-lg font-semibold text-gray-900">
-          {t('dashboard.welcomeBack')}, {user.name || '用户'}
+        <h2 className="text-sm font-medium text-muted-foreground">
+          欢迎回来，<span className="text-foreground font-semibold">{user.name || '用户'}</span>
         </h2>
       </div>
 
-      <div className="flex items-center space-x-4">
-        <Button variant="ghost" size="icon">
-          <Bell className="h-5 w-5 text-gray-600" />
+      <div className="flex items-center space-x-3">
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
+          <Bell className="h-4 w-4" />
         </Button>
 
-        <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
-          <div className="text-right">
-            <p className="text-sm font-medium text-gray-900">{user.name}</p>
-            <p className="text-xs text-gray-600">{user.email}</p>
+        <div className="flex items-center space-x-3 pl-3 border-l border-border">
+          <div className="text-right hidden sm:block">
+            <p className="text-xs font-medium text-foreground">{user.name}</p>
+            <p className="text-[10px] text-muted-foreground">{user.email}</p>
           </div>
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-            <User className="h-5 w-5 text-white" />
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+            {(user.name || 'U')[0].toUpperCase()}
           </div>
         </div>
       </div>
