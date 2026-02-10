@@ -105,6 +105,34 @@ export async function extractTextFromDocument(
     return extractTextFromExcel(buffer)
   }
   
+  // 检查是否是HTML文件 (SEC EDGAR filings are often HTML)
+  if (
+    input === 'text/html' ||
+    input.endsWith('.htm') ||
+    input.endsWith('.html')
+  ) {
+    let html = buffer.toString('utf-8')
+    // Strip HTML tags to extract plain text
+    let text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')  // Remove scripts
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')      // Remove styles
+      .replace(/<[^>]+>/g, ' ')                              // Remove HTML tags
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#\d+;/gi, '')
+      .replace(/\s+/g, ' ')                                 // Collapse whitespace
+      .trim()
+    
+    if (text.length > MAX_TEXT_LENGTH) {
+      text = text.substring(0, MAX_TEXT_LENGTH) + '\n\n[文档内容已截断]'
+    }
+    console.log(`[HTML解析] 提取文本 ${text.length} 字符`)
+    return text
+  }
+  
   // 检查是否是文本文件
   if (input.startsWith('text/') || input.endsWith('.txt')) {
     let text = buffer.toString('utf-8')

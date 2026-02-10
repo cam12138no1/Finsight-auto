@@ -111,7 +111,7 @@ export default function NewDownloadPage() {
   const supplyChainCompanies = COMPANIES.filter(c => c.category === 'AI_Supply_Chain')
 
   return (
-    <div className="space-y-6 max-w-4xl animate-fade-in">
+    <div className="space-y-5 sm:space-y-6 max-w-4xl animate-fade-in">
       {/* Back Button */}
       <Button
         variant="ghost"

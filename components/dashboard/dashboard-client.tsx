@@ -760,9 +760,28 @@ export default function DashboardClient() {
         onClose={() => setIsFilingSelectorOpen(false)}
         onSelect={async (filing) => {
           setIsFilingSelectorOpen(false)
-          // Open upload modal pre-filled — or directly trigger analysis
-          // For now, open upload modal and let user proceed
-          setIsUploadOpen(true)
+          // Directly trigger analysis from database filing
+          try {
+            const res = await fetch('/api/reports/analyze-filing', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                filingId: filing.id,
+                category: filing.category === 'AI_Applications' ? 'AI_APPLICATION' : 'AI_SUPPLY_CHAIN',
+              }),
+            })
+            const data = await res.json()
+            if (data.success) {
+              // Refresh dashboard to show the new analysis
+              loadDashboardData(true)
+            } else {
+              console.error('Analysis failed:', data.error)
+              alert(data.error || '分析失败，请重试')
+            }
+          } catch (err: any) {
+            console.error('Analysis request failed:', err)
+            alert('网络错误，请重试')
+          }
         }}
       />
 

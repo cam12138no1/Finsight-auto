@@ -206,10 +206,27 @@ class EarningsDownloader:
                 # Try SEC EDGAR first for US-listed companies with CIK
                 sec_cik = company.get('sec_cik', '')
                 filing_url = None
+                accession_for_pdf = None  # Track accession for PDF lookup
+
                 if sec_cik:
                     filing_url = await self._search_edgar(client, sec_cik, task.year, task.quarter)
 
-                # Fallback to IR page scraping
+                    # If we found an HTML filing, try to find PDF version
+                    if filing_url and not filing_url.lower().endswith('.pdf'):
+                        # Extract accession from URL: .../edgar/data/{cik}/{acc_clean}/{doc}
+                        try:
+                            parts = filing_url.split('/')
+                            acc_clean = parts[-2]  # accession without dashes
+                            # Reconstruct dashed accession for index lookup
+                            acc_dashed = f"{acc_clean[:10]}-{acc_clean[10:12]}-{acc_clean[12:]}"
+                            pdf_url = await self._find_pdf_in_filing_index(client, sec_cik, acc_dashed)
+                            if pdf_url:
+                                logger.info(f"PDF found for {ticker} {task.year} {task.quarter}, using PDF instead of HTML")
+                                filing_url = pdf_url
+                        except Exception as e:
+                            logger.debug(f"PDF search failed, using HTML: {e}")
+
+                # Fallback to IR page scraping (already prefers PDF links)
                 if not filing_url and company.get('ir_url'):
                     filing_url = await self._search_ir_page(
                         client, company['ir_url'], ticker, task.year, task.quarter
@@ -486,6 +503,49 @@ class EarningsDownloader:
         cik_num = cik.lstrip('0')
         return f"{EDGAR_ARCHIVES}/{cik_num}/{accession_clean}/{primary_doc}"
 
+    async def _find_pdf_in_filing_index(
+        self, client: httpx.AsyncClient, cik: str, accession: str
+    ) -> Optional[str]:
+        """Search the EDGAR filing index for a PDF version of the filing.
+        SEC filings often have both HTML (primary) and PDF versions.
+        Returns the PDF URL if found, None otherwise.
+        """
+        try:
+            accession_clean = accession.replace('-', '')
+            cik_num = cik.lstrip('0')
+            index_url = f"{EDGAR_ARCHIVES}/{cik_num}/{accession_clean}/index.json"
+
+            response = await self._rate_limited_request(client, index_url, EDGAR_HEADERS)
+            data = response.json()
+
+            items = data.get('directory', {}).get('item', [])
+
+            # Find PDF files, excluding tiny exhibits
+            pdf_candidates = []
+            for item in items:
+                name = item.get('name', '')
+                size_str = item.get('size', '0')
+                try:
+                    size = int(size_str)
+                except (ValueError, TypeError):
+                    size = 0
+
+                if name.lower().endswith('.pdf') and size > 10000:  # > 10KB
+                    pdf_candidates.append({'name': name, 'size': size})
+
+            if pdf_candidates:
+                # Prefer the largest PDF (most likely the full filing, not an exhibit)
+                pdf_candidates.sort(key=lambda x: x['size'], reverse=True)
+                pdf_name = pdf_candidates[0]['name']
+                pdf_url = f"{EDGAR_ARCHIVES}/{cik_num}/{accession_clean}/{pdf_name}"
+                logger.debug(f"Found PDF alternative: {pdf_name} ({pdf_candidates[0]['size']} bytes)")
+                return pdf_url
+
+        except Exception as e:
+            logger.debug(f"Could not search filing index for PDF: {e}")
+
+        return None
+
     async def _search_ir_page(
         self, client: httpx.AsyncClient, ir_url: str, ticker: str,
         year: int, quarter: str
@@ -553,10 +613,10 @@ class EarningsDownloader:
                 if not quarter_match:
                     continue
 
-                # Score the match
+                # Score the match — strongly prefer PDFs
                 score = 0
                 if href.lower().endswith('.pdf'):
-                    score += 10  # Prefer PDFs
+                    score += 50  # Strongly prefer PDFs
                 if 'EARNINGS' in combined:
                     score += 5
                 if '10-Q' in combined or '10-K' in combined:
