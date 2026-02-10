@@ -107,17 +107,20 @@ export async function POST(request: NextRequest) {
       console.log('[上传] 未发现已存在的记录，继续处理')
     }
     
-    // Get files
-    const financialFiles = formData.getAll('financialFiles') as File[]
+    // Get files — support multiple field names for compatibility
+    let financialFiles = formData.getAll('financialFiles') as File[]
     const researchFiles = formData.getAll('researchFiles') as File[]
     const category = formData.get('category') as string | null
     const userFiscalYear = formData.get('fiscalYear') as string | null
     const userFiscalQuarter = formData.get('fiscalQuarter') as string | null
     
-    // Backward compatibility
-    const singleFile = formData.get('file') as File | null
-    if (singleFile && financialFiles.length === 0) {
-      financialFiles.push(singleFile)
+    // Backward compatibility: accept 'files' (plural) and 'file' (singular)
+    if (financialFiles.length === 0) {
+      financialFiles = formData.getAll('files') as File[]
+    }
+    if (financialFiles.length === 0) {
+      const singleFile = formData.get('file') as File | null
+      if (singleFile) financialFiles = [singleFile]
     }
 
     if (financialFiles.length === 0) {

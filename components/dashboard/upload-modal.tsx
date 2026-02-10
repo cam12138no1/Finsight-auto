@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { X, Upload, Loader2, FileText, CheckCircle2, AlertCircle, Trash2, Building2, Cpu, FileBarChart, BookOpen, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toaster'
-import { upload } from '@vercel/blob/client'
 import { signOut } from 'next-auth/react'
 
 interface UploadModalProps {
@@ -16,12 +15,6 @@ interface UploadModalProps {
 interface FileItem {
   file: File
   id: string
-}
-
-interface UploadedFile {
-  url: string
-  pathname: string
-  originalName: string
 }
 
 type AnalysisStatus = 'idle' | 'uploading' | 'analyzing' | 'success' | 'error'
@@ -145,60 +138,6 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
     }
   }
 
-  /**
-   * 使用 Vercel Blob 客户端直接上传文件
-   * 绕过 Serverless Functions 的 4.5MB 限制
-   * 支持最大 500MB 的文件
-   */
-  const uploadFileToBlob = async (file: File, prefix: string): Promise<UploadedFile> => {
-    const timestamp = Date.now()
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const pathname = `uploads/${prefix}/${timestamp}_${safeName}`
-    
-    console.log(`[Blob上传] 开始上传: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
-    
-    // 重试机制
-    const maxRetries = 3
-    let lastError: Error | null = null
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[Blob上传] 尝试 ${attempt}/${maxRetries}`)
-        
-        const blob = await upload(pathname, file, {
-          access: 'public',
-          handleUploadUrl: '/api/blob/upload-token',
-        })
-        
-        console.log(`[Blob上传] 完成: ${blob.url}`)
-        
-        return {
-          url: blob.url,
-          pathname: blob.pathname,
-          originalName: file.name,
-        }
-      } catch (error: any) {
-        lastError = error
-        console.error(`[Blob上传] 尝试 ${attempt} 失败:`, error.message)
-        
-        // 如果是认证错误，不重试
-        if (error.message?.includes('未授权') || error.message?.includes('401')) {
-          throw new Error('登录已过期，请刷新页面重新登录')
-        }
-        
-        // 如果不是最后一次尝试，等待后重试
-        if (attempt < maxRetries) {
-          const delay = attempt * 1000 // 1s, 2s, 3s
-          console.log(`[Blob上传] ${delay}ms 后重试...`)
-          await new Promise(resolve => setTimeout(resolve, delay))
-        }
-      }
-    }
-    
-    // 所有重试都失败
-    throw new Error(lastError?.message || '文件上传失败，请稍后重试')
-  }
-
   // ★★★ 验证Session是否有效 ★★★
   const validateSession = async (): Promise<boolean> => {
     try {
@@ -300,131 +239,49 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
     setUploadProgress('准备上传文件...')
 
     try {
-      // ★★★ 第一步：上传文件 ★★★
-      // 尝试 Vercel Blob, 如果不可用则走 FormData 直接上传
-      const uploadedFinancialFiles: UploadedFile[] = []
-      const uploadedResearchFiles: UploadedFile[] = []
-      let useFallbackUpload = false
-      
-      try {
-        // 尝试 Blob 上传
-        for (let i = 0; i < financialFiles.length; i++) {
-          const item = financialFiles[i]
-          setUploadProgress(`上传财报 ${i + 1}/${financialFiles.length}: ${item.file.name}`)
-          const uploaded = await uploadFileToBlob(item.file, 'financial')
-          uploadedFinancialFiles.push(uploaded)
-        }
-        for (let i = 0; i < researchFiles.length; i++) {
-          const item = researchFiles[i]
-          setUploadProgress(`上传研报 ${i + 1}/${researchFiles.length}: ${item.file.name}`)
-          const uploaded = await uploadFileToBlob(item.file, 'research')
-          uploadedResearchFiles.push(uploaded)
-        }
-      } catch (blobError: any) {
-        // Blob 不可用 (Render 部署) — 走 FormData 直接上传分析
-        console.log('[前端] Blob上传不可用，切换到直接上传模式:', blobError.message)
-        useFallbackUpload = true
+      // ★★★ Render 部署：直接 FormData 上传+分析（无 Vercel Blob）★★★
+      setUploadProgress('上传文件中...')
+      setAnalysisStatus('analyzing')
+
+      const formData = new FormData()
+      formData.append('requestId', requestId)
+      formData.append('category', selectedCategory || '')
+      formData.append('fiscalYear', String(selectedYear))
+      formData.append('fiscalQuarter', String(selectedQuarter))
+      for (const item of financialFiles) {
+        formData.append('financialFiles', item.file)
+      }
+      for (const item of researchFiles) {
+        formData.append('researchFiles', item.file)
       }
 
-      // 如果 Blob 不可用，走 /api/reports/upload (FormData 直接上传+分析)
-      if (useFallbackUpload) {
-        setUploadProgress('直接上传分析中...')
-        setAnalysisStatus('analyzing')
-        
-        const formData = new FormData()
-        formData.append('requestId', requestId)
-        formData.append('category', selectedCategory || '')
-        formData.append('fiscalYear', String(selectedYear))
-        formData.append('fiscalQuarter', String(selectedQuarter))
-        for (const item of financialFiles) {
-          formData.append('files', item.file)
-        }
-        for (const item of researchFiles) {
-          formData.append('researchFiles', item.file)
-        }
-        
+      console.log('[前端] 发送 FormData 到 /api/reports/upload')
+
+      let analysisId: string | null = null
+      let fetchSucceeded = false
+
+      try {
         const response = await fetch('/api/reports/upload', {
           method: 'POST',
           body: formData,
           signal: abortControllerRef.current?.signal,
         })
-        
+
         if (currentRequestIdRef.current !== requestId) return
-        
+
+        console.log('[前端] 收到响应，状态:', response.status)
         const result = await response.json()
+
         if (response.ok && !result.error) {
-          setAnalysisStatus('success')
-          toast({ title: '分析完成', description: result.analysis?.one_line_conclusion || '分析已保存' })
-          setTimeout(() => { onClose(); onSuccess() }, 1500)
+          analysisId = result.analysis_id
+          fetchSucceeded = true
+          console.log('[前端] ✓ 分析成功，analysis_id:', analysisId)
         } else {
           throw new Error(result.error || '分析失败')
         }
-        return // Early return — fallback path complete
-      }
-      
-      console.log('[前端] Blob文件上传完成，开始分析')
-      setUploadProgress('')
-      setAnalysisStatus('analyzing')
-
-      // ★★★ 第二步：调用分析API，传递Blob URL ★★★
-      console.log('[前端] 发送请求到 /api/reports/analyze')
-      
-      // ★★★ 新增：超时处理和状态轮询机制 ★★★
-      const FETCH_TIMEOUT = 120000 // 2分钟超时
-      const POLL_INTERVAL = 3000 // 3秒轮询一次
-      const MAX_POLL_TIME = 300000 // 最多轮询5分钟
-      
-      let analysisId: string | null = null
-      let fetchSucceeded = false
-      
-      try {
-        // 创建超时控制器
-        const timeoutController = new AbortController()
-        const timeoutId = setTimeout(() => timeoutController.abort(), FETCH_TIMEOUT)
-        
-        // 合并abort信号
-        const combinedSignal = abortControllerRef.current.signal
-        combinedSignal.addEventListener('abort', () => timeoutController.abort())
-        
-        const response = await fetch('/api/reports/analyze', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            financialFiles: uploadedFinancialFiles,
-            researchFiles: uploadedResearchFiles,
-            category: selectedCategory,
-            requestId: requestId,
-            fiscalYear: selectedYear,
-            fiscalQuarter: selectedQuarter,
-          }),
-          signal: timeoutController.signal,
-        })
-        
-        clearTimeout(timeoutId)
-        
-        // 检查是否是当前请求
-        if (currentRequestIdRef.current !== requestId) {
-          console.log('[前端] ⚠️ 请求ID不匹配，忽略响应')
-          return
-        }
-        
-        console.log('[前端] 收到响应，状态:', response.status)
-        
-        if (!response.ok) {
-          const result = await response.json()
-          throw new Error(result.error || '分析失败')
-        }
-        
-        const result = await response.json()
-        analysisId = result.analysis_id
-        fetchSucceeded = true
-        console.log('[前端] ✓ 分析成功，analysis_id:', analysisId)
-        
       } catch (fetchError: any) {
         // 如果是超时或网络错误，尝试轮询状态
-        const isNetworkError = 
+        const isNetworkError =
           fetchError.name === 'AbortError' ||
           fetchError.name === 'TypeError' ||
           fetchError.message?.includes('fetch') ||

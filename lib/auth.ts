@@ -84,12 +84,11 @@ export const authOptions: NextAuthOptions = {
 
         // Production mode: use database
         try {
-          const { sql } = await import('@vercel/postgres')
-          const result = await sql`
-            SELECT id, email, name, password_hash, role, permissions
-            FROM users
-            WHERE email = ${credentials.email}
-          `
+          const { query: dbQuery } = await import('@/lib/db/connection')
+          const result = await dbQuery(
+            'SELECT id, email, name, password_hash, role, permissions FROM users WHERE email = $1',
+            [credentials.email]
+          )
 
           if (result.rows.length === 0) {
             // ★ 兼容模式：如果数据库中找不到，检查是否是demo用户
