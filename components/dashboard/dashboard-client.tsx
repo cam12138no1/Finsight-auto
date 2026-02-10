@@ -454,45 +454,36 @@ export default function DashboardClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900">FinSight AI</h1>
-                <p className="text-xs text-slate-500">智析财报 · 投委会级分析</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                onClick={() => setIsFilingSelectorOpen(true)}
-                variant="outline"
-                className="border-blue-200 text-blue-700 hover:bg-blue-50"
-              >
-                <Database className="mr-2 h-4 w-4" />
-                选择已有财报
-              </Button>
-              <Button 
-                onClick={() => setIsUploadOpen(true)}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                上传财报
-              </Button>
-            </div>
-          </div>
+    <div className="animate-fade-in">
+      {/* Page Header */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">财报分析</h2>
+          <p className="text-sm text-muted-foreground mt-1">AI 投委会级深度分析 <span className="mx-1.5 text-border">|</span> 上传或选择已有财报</p>
         </div>
-      </header>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => setIsFilingSelectorOpen(true)}
+            variant="outline"
+            className="border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+          >
+            <Database className="mr-2 h-4 w-4" />
+            选择已有财报
+          </Button>
+          <Button 
+            onClick={() => setIsUploadOpen(true)}
+            className="gradient-primary text-white shadow-sm shadow-blue-600/20 hover:shadow-md hover:shadow-blue-600/30 transition-all cursor-pointer"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            上传财报
+          </Button>
+        </div>
+      </div>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <div>
         {/* Processing Banner - 只在有有效处理中任务时显示 */}
         {processingAnalyses.length > 0 && (
-          <div className="mb-6 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-5 text-white shadow-xl shadow-orange-500/20">
+          <div className="mb-6 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-5 text-white shadow-lg shadow-amber-500/15">
             <div className="flex items-center gap-4">
               <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -752,7 +743,7 @@ export default function DashboardClient() {
             <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
           </div>
         )}
-      </main>
+      </div>
 
       {/* Upload Modal */}
       <UploadModal

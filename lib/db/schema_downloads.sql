@@ -3,12 +3,16 @@
 -- Adds SEC EDGAR auto-download capabilities to the platform
 -- ================================================================
 
--- Extend companies table with category and SEC metadata
+-- Extend companies table with category, SEC metadata, and ticker alias
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS ticker VARCHAR(10);
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'AI_Applications';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS ir_url VARCHAR(500);
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS sec_cik VARCHAR(20) DEFAULT '';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+-- Ensure ticker matches symbol for any existing rows
+UPDATE companies SET ticker = symbol WHERE ticker IS NULL;
 
 -- Download jobs table (tracks batch download tasks)
 CREATE TABLE IF NOT EXISTS download_jobs (
@@ -70,32 +74,33 @@ CREATE INDEX IF NOT EXISTS idx_shared_filings_lookup ON shared_filings(company_i
 CREATE INDEX IF NOT EXISTS idx_companies_category ON companies(category);
 
 -- Seed AI companies (24 companies)
-INSERT INTO companies (symbol, name, sector, category, sec_cik, ir_url, description, is_active) VALUES
-  ('MSFT', 'Microsoft', 'Technology', 'AI_Applications', '0000789019', 'https://www.microsoft.com/en-us/investor/earnings/', 'Cloud, AI, Office', true),
-  ('GOOGL', 'Alphabet', 'Technology', 'AI_Applications', '0001652044', 'https://abc.xyz/investor/', 'Google, Cloud, AI', true),
-  ('AMZN', 'Amazon', 'Technology', 'AI_Applications', '0001018724', 'https://ir.aboutamazon.com/quarterly-results/', 'AWS, E-commerce', true),
-  ('META', 'Meta Platforms', 'Technology', 'AI_Applications', '0001326801', 'https://investor.fb.com/financials/', 'Social, Metaverse, AI', true),
-  ('CRM', 'Salesforce', 'Technology', 'AI_Applications', '0001108524', 'https://investor.salesforce.com/financials/', 'CRM, Enterprise AI', true),
-  ('NOW', 'ServiceNow', 'Technology', 'AI_Applications', '0001373715', 'https://investors.servicenow.com/financials/', 'Workflow, AI Agent', true),
-  ('PLTR', 'Palantir', 'Technology', 'AI_Applications', '0001321655', 'https://investors.palantir.com/financials/', 'Big Data, AIP', true),
-  ('AAPL', 'Apple', 'Technology', 'AI_Applications', '0000320193', 'https://investor.apple.com/investor-relations/', 'Consumer, Apple Intelligence', true),
-  ('APP', 'AppLovin', 'Technology', 'AI_Applications', '0001751008', 'https://investors.applovin.com/financials/', 'AI Ad Tech', true),
-  ('ADBE', 'Adobe', 'Technology', 'AI_Applications', '0000796343', 'https://www.adobe.com/investor-relations/earnings.html', 'Creative, AI, Firefly', true),
-  ('NVDA', 'Nvidia', 'Technology', 'AI_Supply_Chain', '0001045810', 'https://investor.nvidia.com/financial-info/', 'GPU, AI Chips', true),
-  ('AMD', 'AMD', 'Technology', 'AI_Supply_Chain', '0000002488', 'https://ir.amd.com/financial-information/', 'CPU/GPU, MI Series', true),
-  ('AVGO', 'Broadcom', 'Technology', 'AI_Supply_Chain', '0001730168', 'https://investors.broadcom.com/financials/', 'Networking, Custom AI', true),
-  ('TSM', 'TSMC', 'Technology', 'AI_Supply_Chain', '0001046179', 'https://investor.tsmc.com/english/quarterly-results', 'Foundry', true),
-  ('SKH', 'SK Hynix', 'Technology', 'AI_Supply_Chain', '', 'https://www.skhynix.com/eng/ir/earnings.do', 'HBM, Memory', true),
-  ('MU', 'Micron', 'Technology', 'AI_Supply_Chain', '0000723125', 'https://investors.micron.com/financials/', 'HBM, DRAM', true),
-  ('SSNLF', 'Samsung', 'Technology', 'AI_Supply_Chain', '', 'https://www.samsung.com/global/ir/', 'Memory, Foundry', true),
-  ('INTC', 'Intel', 'Technology', 'AI_Supply_Chain', '0000050863', 'https://www.intc.com/financial-info/', 'CPU, Foundry', true),
-  ('VRT', 'Vertiv', 'Technology', 'AI_Supply_Chain', '0001674101', 'https://investors.vertiv.com/financials/', 'Data Center Infra', true),
-  ('ETN', 'Eaton', 'Industrials', 'AI_Supply_Chain', '0001551182', 'https://www.eaton.com/us/en-us/company/investors/', 'Power Management', true),
-  ('GEV', 'GE Vernova', 'Industrials', 'AI_Supply_Chain', '0001996810', 'https://www.gevernova.com/investors/', 'Power Equipment', true),
-  ('VST', 'Vistra', 'Utilities', 'AI_Supply_Chain', '0001692819', 'https://investors.vistracorp.com/financials/', 'Power Supply', true),
-  ('ASML', 'ASML', 'Technology', 'AI_Supply_Chain', '0000937966', 'https://www.asml.com/en/investors/', 'Lithography, EUV', true),
-  ('SNPS', 'Synopsys', 'Technology', 'AI_Supply_Chain', '0000883241', 'https://investor.synopsys.com/financials/', 'EDA Tools', true)
+INSERT INTO companies (symbol, ticker, name, sector, category, sec_cik, ir_url, description, is_active) VALUES
+  ('MSFT', 'MSFT', 'Microsoft', 'Technology', 'AI_Applications', '0000789019', 'https://www.microsoft.com/en-us/investor/earnings/', 'Cloud, AI, Office', true),
+  ('GOOGL', 'GOOGL', 'Alphabet', 'Technology', 'AI_Applications', '0001652044', 'https://abc.xyz/investor/', 'Google, Cloud, AI', true),
+  ('AMZN', 'AMZN', 'Amazon', 'Technology', 'AI_Applications', '0001018724', 'https://ir.aboutamazon.com/quarterly-results/', 'AWS, E-commerce', true),
+  ('META', 'META', 'Meta Platforms', 'Technology', 'AI_Applications', '0001326801', 'https://investor.fb.com/financials/', 'Social, Metaverse, AI', true),
+  ('CRM', 'CRM', 'Salesforce', 'Technology', 'AI_Applications', '0001108524', 'https://investor.salesforce.com/financials/', 'CRM, Enterprise AI', true),
+  ('NOW', 'NOW', 'ServiceNow', 'Technology', 'AI_Applications', '0001373715', 'https://investors.servicenow.com/financials/', 'Workflow, AI Agent', true),
+  ('PLTR', 'PLTR', 'Palantir', 'Technology', 'AI_Applications', '0001321655', 'https://investors.palantir.com/financials/', 'Big Data, AIP', true),
+  ('AAPL', 'AAPL', 'Apple', 'Technology', 'AI_Applications', '0000320193', 'https://investor.apple.com/investor-relations/', 'Consumer, Apple Intelligence', true),
+  ('APP', 'APP', 'AppLovin', 'Technology', 'AI_Applications', '0001751008', 'https://investors.applovin.com/financials/', 'AI Ad Tech', true),
+  ('ADBE', 'ADBE', 'Adobe', 'Technology', 'AI_Applications', '0000796343', 'https://www.adobe.com/investor-relations/earnings.html', 'Creative, AI, Firefly', true),
+  ('NVDA', 'NVDA', 'Nvidia', 'Technology', 'AI_Supply_Chain', '0001045810', 'https://investor.nvidia.com/financial-info/', 'GPU, AI Chips', true),
+  ('AMD', 'AMD', 'AMD', 'Technology', 'AI_Supply_Chain', '0000002488', 'https://ir.amd.com/financial-information/', 'CPU/GPU, MI Series', true),
+  ('AVGO', 'AVGO', 'Broadcom', 'Technology', 'AI_Supply_Chain', '0001730168', 'https://investors.broadcom.com/financials/', 'Networking, Custom AI', true),
+  ('TSM', 'TSM', 'TSMC', 'Technology', 'AI_Supply_Chain', '0001046179', 'https://investor.tsmc.com/english/quarterly-results', 'Foundry', true),
+  ('SKH', 'SKH', 'SK Hynix', 'Technology', 'AI_Supply_Chain', '', 'https://www.skhynix.com/eng/ir/earnings.do', 'HBM, Memory', true),
+  ('MU', 'MU', 'Micron', 'Technology', 'AI_Supply_Chain', '0000723125', 'https://investors.micron.com/financials/', 'HBM, DRAM', true),
+  ('SSNLF', 'SSNLF', 'Samsung', 'Technology', 'AI_Supply_Chain', '', 'https://www.samsung.com/global/ir/', 'Memory, Foundry', true),
+  ('INTC', 'INTC', 'Intel', 'Technology', 'AI_Supply_Chain', '0000050863', 'https://www.intc.com/financial-info/', 'CPU, Foundry', true),
+  ('VRT', 'VRT', 'Vertiv', 'Technology', 'AI_Supply_Chain', '0001674101', 'https://investors.vertiv.com/financials/', 'Data Center Infra', true),
+  ('ETN', 'ETN', 'Eaton', 'Industrials', 'AI_Supply_Chain', '0001551182', 'https://www.eaton.com/us/en-us/company/investors/', 'Power Management', true),
+  ('GEV', 'GEV', 'GE Vernova', 'Industrials', 'AI_Supply_Chain', '0001996810', 'https://www.gevernova.com/investors/', 'Power Equipment', true),
+  ('VST', 'VST', 'Vistra', 'Utilities', 'AI_Supply_Chain', '0001692819', 'https://investors.vistracorp.com/financials/', 'Power Supply', true),
+  ('ASML', 'ASML', 'ASML', 'Technology', 'AI_Supply_Chain', '0000937966', 'https://www.asml.com/en/investors/', 'Lithography, EUV', true),
+  ('SNPS', 'SNPS', 'Synopsys', 'Technology', 'AI_Supply_Chain', '0000883241', 'https://investor.synopsys.com/financials/', 'EDA Tools', true)
 ON CONFLICT (symbol) DO UPDATE SET
+  ticker = EXCLUDED.ticker,
   category = EXCLUDED.category,
   sec_cik = EXCLUDED.sec_cik,
   ir_url = EXCLUDED.ir_url,

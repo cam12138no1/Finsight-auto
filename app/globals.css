@@ -4,13 +4,23 @@
 
 @layer base {
   /* ================================================================
-     LIGHT MODE — 金融科技风格
-     Primary: Deep Navy (#0F172A → #1E293B)
-     Accent: Gold (#D4A847) for financial emphasis
-     Clean whites, subtle blue-gray tones
+     FINSIGHT DESIGN SYSTEM — Financial Intelligence Platform
+     
+     Design Language: Glassmorphism + Executive Dashboard
+     Target: Institutional financial clients (PE/VC)
+     
+     Primary: Deep Navy (#0A1628)
+     Accent: Warm Gold (#D4A847) — trust, premium
+     Success: Emerald (#059669)
+     Danger: Rose (#E11D48)
+     
+     Typography: Inter — clean, data-readable
+     Spacing: 4px base grid
+     Border Radius: 12px cards, 8px inputs, 20px buttons
      ================================================================ */
+
   :root {
-    --background: 210 20% 98%;
+    --background: 220 20% 97%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -18,53 +28,76 @@
     --popover-foreground: 222 47% 11%;
     --primary: 221 83% 53%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
+    --secondary: 215 20% 95%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
+    --muted: 220 14% 96%;
     --muted-foreground: 215 16% 47%;
     --accent: 43 74% 55%;
     --accent-foreground: 43 74% 15%;
-    --destructive: 0 84% 60%;
+    --destructive: 346 77% 50%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
     --ring: 221 83% 53%;
-    --radius: 0.625rem;
-    --sidebar-bg: 222 47% 11%;
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-bg: 222 47% 7%;
     --sidebar-text: 213 31% 91%;
-    --sidebar-hover: 217 33% 17%;
+    --sidebar-hover: 220 30% 12%;
     --sidebar-active: 221 83% 53%;
+
+    /* Financial accent */
     --gold: 43 74% 55%;
+    --gold-muted: 43 40% 94%;
+
+    /* Status colors */
+    --success: 160 84% 39%;
+    --success-muted: 152 76% 95%;
+    --warning: 38 92% 50%;
+    --warning-muted: 45 93% 95%;
+    --info: 217 91% 60%;
+    --info-muted: 214 95% 96%;
   }
 
   /* ================================================================
-     DARK MODE — 深色金融终端风格
+     DARK MODE — Bloomberg Terminal Aesthetic
      ================================================================ */
   .dark {
-    --background: 222 47% 7%;
+    --background: 224 47% 5%;
     --foreground: 210 40% 96%;
-    --card: 222 47% 10%;
+    --card: 224 47% 7%;
     --card-foreground: 210 40% 96%;
-    --popover: 222 47% 10%;
+    --popover: 224 47% 7%;
     --popover-foreground: 210 40% 96%;
     --primary: 217 91% 60%;
     --primary-foreground: 222 47% 7%;
-    --secondary: 217 33% 17%;
+    --secondary: 220 30% 12%;
     --secondary-foreground: 210 40% 96%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 220 30% 12%;
+    --muted-foreground: 215 20% 60%;
     --accent: 43 74% 55%;
     --accent-foreground: 43 74% 95%;
-    --destructive: 0 63% 55%;
+    --destructive: 346 77% 50%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
+    --border: 220 20% 14%;
+    --input: 220 20% 14%;
     --ring: 217 91% 60%;
-    --sidebar-bg: 222 47% 5%;
+
+    --sidebar-bg: 224 47% 4%;
     --sidebar-text: 215 20% 65%;
-    --sidebar-hover: 217 33% 12%;
+    --sidebar-hover: 220 30% 8%;
     --sidebar-active: 217 91% 60%;
+
     --gold: 43 74% 55%;
+    --gold-muted: 43 30% 12%;
+
+    --success: 160 84% 39%;
+    --success-muted: 160 50% 10%;
+    --warning: 38 92% 50%;
+    --warning-muted: 38 50% 10%;
+    --info: 217 91% 60%;
+    --info-muted: 217 50% 10%;
   }
 }
 
@@ -74,70 +107,214 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "cv11", "ss01";
+    font-feature-settings: "cv11", "ss01", "cv01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 @layer components {
-  /* Financial metric cards */
+  /* ================================================================
+     FINANCIAL METRIC CARDS
+     ================================================================ */
   .metric-card {
-    @apply bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200;
-  }
-  .data-label {
-    @apply text-xs font-semibold text-muted-foreground uppercase tracking-wider;
-  }
-  .data-value {
-    @apply text-2xl font-bold text-foreground mt-1 font-mono;
+    @apply relative bg-card rounded-2xl p-6 border border-border/60
+           shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]
+           hover:shadow-[0_4px_16px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.03)]
+           transition-all duration-200 ease-out;
   }
 
-  /* Beat/Miss badges */
+  .data-label {
+    @apply text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em] leading-none;
+  }
+
+  .data-value {
+    @apply text-2xl font-bold text-foreground mt-1.5 font-mono tabular-nums tracking-tight;
+  }
+
+  /* ================================================================
+     FINANCIAL BADGES (Beat/Miss/Inline)
+     ================================================================ */
   .badge-beat {
-    @apply bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800;
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200/60
+           dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40;
   }
   .badge-miss {
-    @apply bg-red-50 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800;
+    @apply bg-rose-50 text-rose-700 border border-rose-200/60
+           dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/40;
   }
   .badge-inline {
-    @apply bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800;
+    @apply bg-blue-50 text-blue-700 border border-blue-200/60
+           dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/40;
+  }
+  .badge-gold {
+    @apply bg-amber-50 text-amber-700 border border-amber-200/60
+           dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/40;
   }
 
-  /* Gold accent for financial emphasis */
+  /* ================================================================
+     GOLD ACCENT — Premium Financial Emphasis
+     ================================================================ */
   .gold-accent {
     color: hsl(var(--gold));
   }
   .gold-bg {
-    background-color: hsl(var(--gold) / 0.1);
+    background-color: hsl(var(--gold) / 0.08);
   }
 
-  /* Glass effect for premium feel */
+  /* ================================================================
+     GLASS EFFECT — Frosted Premium Surfaces
+     ================================================================ */
   .glass {
-    @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-700/30;
+    @apply bg-white/70 dark:bg-slate-900/70
+           backdrop-blur-2xl backdrop-saturate-150
+           border border-white/30 dark:border-slate-700/20
+           shadow-[0_8px_32px_rgba(0,0,0,0.04)];
+  }
+  .glass-subtle {
+    @apply bg-white/50 dark:bg-slate-900/50
+           backdrop-blur-xl border border-white/20 dark:border-slate-700/15;
   }
 
-  /* Subtle gradient backgrounds */
+  /* ================================================================
+     GRADIENT BACKGROUNDS
+     ================================================================ */
   .gradient-subtle {
-    @apply bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-900 dark:to-blue-950/30;
+    @apply bg-gradient-to-br from-slate-50 via-white to-blue-50/20
+           dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/20;
+  }
+  .gradient-primary {
+    @apply bg-gradient-to-r from-blue-600 to-indigo-600;
+  }
+  .gradient-gold {
+    @apply bg-gradient-to-r from-amber-500 to-yellow-500;
+  }
+
+  /* ================================================================
+     TABLE STYLING — Financial Data Tables
+     ================================================================ */
+  .fin-table {
+    @apply w-full text-sm;
+  }
+  .fin-table thead tr {
+    @apply border-b-2 border-slate-200 dark:border-slate-700;
+  }
+  .fin-table thead th {
+    @apply text-left px-4 py-3 text-[11px] font-semibold text-slate-500
+           dark:text-slate-400 uppercase tracking-[0.06em] bg-slate-50/80 dark:bg-slate-800/40;
+  }
+  .fin-table tbody tr {
+    @apply border-b border-slate-100 dark:border-slate-800
+           hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-colors duration-150;
+  }
+  .fin-table tbody td {
+    @apply px-4 py-3.5;
+  }
+
+  /* ================================================================
+     SIDEBAR NAVIGATION
+     ================================================================ */
+  .nav-item {
+    @apply flex items-center px-3 py-2.5 text-sm font-medium rounded-xl
+           transition-all duration-200 cursor-pointer;
+  }
+  .nav-item-active {
+    @apply bg-blue-600/15 text-blue-400;
+  }
+  .nav-item-inactive {
+    @apply text-slate-400 hover:bg-white/5 hover:text-slate-200;
+  }
+
+  /* ================================================================
+     STATUS INDICATOR DOT
+     ================================================================ */
+  .status-dot {
+    @apply inline-block w-2 h-2 rounded-full;
+  }
+  .status-dot-success { @apply bg-emerald-500; }
+  .status-dot-warning { @apply bg-amber-500; }
+  .status-dot-error { @apply bg-rose-500; }
+  .status-dot-info { @apply bg-blue-500; }
+  .status-dot-neutral { @apply bg-slate-400; }
+
+  /* ================================================================
+     PROGRESS BAR — Financial Style
+     ================================================================ */
+  .progress-track {
+    @apply w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden;
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-700 ease-out;
   }
 }
 
-/* Smooth transitions for theme switching */
+/* ================================================================
+   SMOOTH TRANSITIONS — Theme + State Changes
+   ================================================================ */
 * {
-  transition-property: background-color, border-color, color;
+  transition-property: background-color, border-color, color, box-shadow, opacity;
   transition-duration: 150ms;
-  transition-timing-function: ease;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Scrollbar styling */
+/* Exclude transitions on elements that shouldn't animate */
+input, textarea, [data-no-transition] {
+  transition-property: border-color, box-shadow;
+}
+
+/* ================================================================
+   SCROLLBAR — Minimal, Professional
+   ================================================================ */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+  @apply bg-slate-300/60 dark:bg-slate-600/40 rounded-full;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400 dark:bg-slate-500;
+  @apply bg-slate-400/80 dark:bg-slate-500/60;
+}
+
+/* ================================================================
+   FOCUS STATES — Accessibility (WCAG AA)
+   ================================================================ */
+:focus-visible {
+  @apply outline-none ring-2 ring-blue-500/40 ring-offset-2 ring-offset-background;
+}
+
+/* ================================================================
+   SELECTION COLOR
+   ================================================================ */
+::selection {
+  @apply bg-blue-600/15 text-blue-900 dark:text-blue-100;
+}
+
+/* ================================================================
+   ANIMATIONS
+   ================================================================ */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
 }

@@ -32,7 +32,16 @@ EDGAR_HEADERS = {
 HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                   "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/120.0.0.0 Safari/537.36",
+                  "Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
 }
 
 # Configuration
@@ -350,8 +359,11 @@ class EarningsDownloader:
             periods = recent.get('reportDate', [])
 
             # Determine which form types to look for
+            # NOTE: Q4 does NOT have a separate 10-Q — Q4 results are in the 10-K annual.
             if quarter == "FY":
                 target_forms = {'10-K', '20-F'}  # 20-F for foreign issuers
+            elif quarter == "Q4":
+                target_forms = {'10-Q', '10-K', '6-K', '20-F'}  # Q4 falls back to annual
             else:
                 target_forms = {'10-Q', '6-K'}    # 6-K for foreign issuers
 
@@ -388,6 +400,25 @@ class EarningsDownloader:
             if quarter == "FY":
                 for c in candidates:
                     # Period year should match (report covers this fiscal year)
+                    py = c['period_year']
+                    if py == year or (py == year + 1 and c['period_month'] <= 3):
+                        return self._build_filing_url(cik, accessions[c['index']], primary_docs[c['index']])
+
+            elif quarter == "Q4":
+                # Q4 special handling: first try 10-Q, then fall back to 10-K
+                # Most US companies report Q4 via the annual 10-K, not a separate 10-Q
+                q4_10q = [c for c in candidates if c['form'] in ('10-Q', '6-K')]
+                q4_10k = [c for c in candidates if c['form'] in ('10-K', '20-F')]
+
+                # Try 10-Q first (rare but some companies file it)
+                for c in q4_10q:
+                    pm = c['period_month']
+                    py = c['period_year']
+                    if pm in {10, 11, 12, 1} and (py == year or (py == year + 1 and pm <= 1)):
+                        return self._build_filing_url(cik, accessions[c['index']], primary_docs[c['index']])
+
+                # Fall back to 10-K annual (covers Q4)
+                for c in q4_10k:
                     py = c['period_year']
                     if py == year or (py == year + 1 and c['period_month'] <= 3):
                         return self._build_filing_url(cik, accessions[c['index']], primary_docs[c['index']])
@@ -459,9 +490,24 @@ class EarningsDownloader:
         self, client: httpx.AsyncClient, ir_url: str, ticker: str,
         year: int, quarter: str
     ) -> Optional[str]:
-        """Search company IR page for filing links"""
+        """Search company IR page for filing links.
+        Gracefully handles 403/blocking by returning None.
+        """
         try:
-            response = await self._rate_limited_request(client, ir_url, HTTP_HEADERS)
+            # Use non-raising request for IR pages (many sites block scrapers)
+            async with self._rate_limiter:
+                now = time.monotonic()
+                elapsed = now - self._last_request_time
+                if elapsed < RATE_LIMIT_DELAY:
+                    await asyncio.sleep(RATE_LIMIT_DELAY - elapsed)
+                self._last_request_time = time.monotonic()
+
+            response = await client.get(ir_url, headers=HTTP_HEADERS)
+            if response.status_code in (403, 401, 429, 503):
+                logger.debug(f"IR page returned {response.status_code} for {ticker}, skipping")
+                return None
+            response.raise_for_status()
+
             soup = BeautifulSoup(response.text, 'lxml')
             links = soup.find_all('a', href=True)
 
