@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { X, Search, Database, FileText, Download, ChevronRight, Loader2, CheckCircle2 } from 'lucide-react'
+import { X, Search, Database, FileText, Loader2, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+
+/* MASTER.md Modal: bg white, radius 16px, padding 32px, shadow-xl, backdrop blur 4px
+   max-width 500px → we use 640px for filing list */
 
 interface SharedFiling {
   id: number; company_id: number; year: number; quarter: string
@@ -18,73 +20,78 @@ interface FilingSelectorProps {
   onSelect: (filing: SharedFiling) => void
 }
 
-function formatBytes(bytes: number): string {
-  if (!bytes) return '-'
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+function fmtBytes(b: number) {
+  if (!b) return '--'
+  if (b < 1024) return b + ' B'
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'
+  return (b / 1048576).toFixed(1) + ' MB'
 }
 
 export default function FilingSelector({ isOpen, onClose, onSelect }: FilingSelectorProps) {
   const [filings, setFilings] = useState<SharedFiling[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterCategory, setFilterCategory] = useState('')
-  const [filterYear, setFilterYear] = useState('')
+  const [search, setSearch] = useState('')
+  const [catFilter, setCatFilter] = useState('')
+  const [yearFilter, setYearFilter] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
-  const fetchFilings = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (filterCategory) params.set('category', filterCategory)
-      if (filterYear) params.set('year', filterYear)
-      const res = await fetch(`/api/filings?${params}`)
-      const data = await res.json()
-      if (data.success) setFilings(data.data || [])
-    } catch (err) {
-      console.error('Failed to fetch filings:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [filterCategory, filterYear])
+      const p = new URLSearchParams()
+      if (catFilter) p.set('category', catFilter)
+      if (yearFilter) p.set('year', yearFilter)
+      const r = await fetch(`/api/filings?${p}`)
+      const d = await r.json()
+      if (d.success) setFilings(d.data || [])
+    } catch {} finally { setLoading(false) }
+  }, [catFilter, yearFilter])
 
-  useEffect(() => {
-    if (isOpen) fetchFilings()
-  }, [isOpen, fetchFilings])
+  useEffect(() => { if (isOpen) { load(); setSelectedId(null); setSubmitting(false) } }, [isOpen, load])
 
   if (!isOpen) return null
 
   const filtered = filings.filter(f => {
-    if (!searchQuery) return true
-    const q = searchQuery.toLowerCase()
-    return f.company_name?.toLowerCase().includes(q) ||
-           f.company_ticker?.toLowerCase().includes(q) ||
-           f.filename?.toLowerCase().includes(q)
+    if (!search) return true
+    const q = search.toLowerCase()
+    return f.company_name?.toLowerCase().includes(q) || f.company_ticker?.toLowerCase().includes(q)
   })
 
-  // Group by company
   const grouped = new Map<string, SharedFiling[]>()
   for (const f of filtered) {
-    const key = f.company_ticker || 'OTHER'
-    if (!grouped.has(key)) grouped.set(key, [])
-    grouped.get(key)!.push(f)
+    const k = f.company_ticker || 'OTHER'
+    if (!grouped.has(k)) grouped.set(k, [])
+    grouped.get(k)!.push(f)
   }
 
   const years = Array.from(new Set(filings.map(f => f.year))).sort((a, b) => b - a)
 
+  const handleSelect = () => {
+    const filing = filings.find(f => f.id === selectedId)
+    if (filing) {
+      setSubmitting(true)
+      onSelect(filing)
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl bg-card rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col border border-border/60">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      {/* Overlay — MASTER.md: bg black/50, backdrop blur 4px */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal — MASTER.md: radius 16px, shadow-xl */}
+      <div className="relative w-full max-w-[640px] bg-card rounded-2xl shadow-[var(--shadow-xl)] border border-border/50 overflow-hidden max-h-[85vh] flex flex-col animate-fade-in">
+
         {/* Header */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border bg-muted/30">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-950/40 rounded-lg">
-              <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+              <Database className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-foreground">选择已下载财报</h3>
-              <p className="text-xs text-muted-foreground">从数据库中选择财报进行 AI 分析</p>
+              <h2 className="text-base font-semibold text-foreground">选择已下载财报</h2>
+              <p className="text-[12px] text-muted-foreground">从数据库选择并直接 AI 分析</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer">
@@ -93,70 +100,77 @@ export default function FilingSelector({ isOpen, onClose, onSelect }: FilingSele
         </div>
 
         {/* Filters */}
-        <div className="px-5 sm:px-6 py-3 border-b border-border bg-muted/20 flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-            <input type="text" placeholder="搜索公司..." value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full h-8 pl-9 pr-3 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40" />
+        <div className="px-6 py-3 border-b border-border bg-muted/20 flex flex-wrap items-center gap-2 shrink-0">
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+            <input type="text" placeholder="搜索公司..." value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full h-8 pl-9 pr-3 rounded-lg border border-border bg-card text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring/20 transition-all duration-200" />
           </div>
-          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-            className="h-8 px-2 rounded-lg border border-border bg-card text-xs cursor-pointer">
+          <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
+            className="h-8 px-2 rounded-lg border border-border bg-card text-[12px] cursor-pointer">
             <option value="">全部类别</option>
             <option value="AI_Applications">AI 应用</option>
             <option value="AI_Supply_Chain">AI 供应链</option>
           </select>
-          <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
-            className="h-8 px-2 rounded-lg border border-border bg-card text-xs cursor-pointer">
+          <select value={yearFilter} onChange={e => setYearFilter(e.target.value)}
+            className="h-8 px-2 rounded-lg border border-border bg-card text-[12px] cursor-pointer">
             <option value="">全部年份</option>
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
           </select>
         </div>
 
-        {/* Filing List */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* List */}
+        <div className="flex-1 overflow-y-auto px-4 py-3">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : grouped.size === 0 ? (
-            <div className="text-center py-12">
-              <Database className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">暂无已下载财报</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">请先到下载中心创建下载任务</p>
+            <div className="text-center py-16">
+              <Database className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">暂无可选财报</p>
+              <p className="text-[12px] text-muted-foreground/60 mt-1">请先到下载中心创建下载任务</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {Array.from(grouped.entries()).map(([ticker, companyFilings]) => {
-                const first = companyFilings[0]
+              {Array.from(grouped.entries()).map(([ticker, items]) => {
+                const first = items[0]
                 const isApp = first.category === 'AI_Applications'
                 return (
-                  <div key={ticker} className="space-y-1">
-                    <div className="flex items-center gap-2 px-1 mb-1">
+                  <div key={ticker}>
+                    {/* Company header */}
+                    <div className="flex items-center gap-2 px-1 mb-1.5">
                       <div className={`w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold ${
                         isApp ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
                       }`}>{ticker.slice(0, 2)}</div>
                       <span className="text-sm font-semibold text-foreground">{first.company_name}</span>
-                      <span className="text-xs text-muted-foreground font-mono">{ticker}</span>
+                      <span className="text-[11px] text-muted-foreground font-mono">{ticker}</span>
                     </div>
-                    {companyFilings.map(f => (
-                      <button key={f.id} onClick={() => setSelectedId(f.id === selectedId ? null : f.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 cursor-pointer ${
-                          selectedId === f.id
-                            ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/20 ring-2 ring-blue-200/50 dark:ring-blue-800/30'
-                            : 'border-border/60 bg-card hover:border-border hover:bg-muted/30'
-                        }`}>
-                        <FileText className={`h-4 w-4 shrink-0 ${selectedId === f.id ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground/50'}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{f.year} {f.quarter}</span>
-                            <Badge variant="secondary" className="text-[10px]">{f.quarter === 'FY' ? '年报' : '季报'}</Badge>
-                          </div>
-                          <p className="text-xs text-slate-400 truncate">{f.filename} · {formatBytes(f.file_size)}</p>
-                        </div>
-                        {selectedId === f.id && <CheckCircle2 className="h-5 w-5 text-blue-500 shrink-0" />}
-                      </button>
-                    ))}
+                    {/* Filing items */}
+                    <div className="space-y-1">
+                      {items.map(f => {
+                        const on = selectedId === f.id
+                        return (
+                          <button key={f.id} onClick={() => setSelectedId(on ? null : f.id)}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 cursor-pointer ${
+                              on ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-950/20 ring-1 ring-blue-300/50 dark:ring-blue-700/30'
+                                 : 'border-border/50 bg-card hover:bg-muted/30 hover:border-border'
+                            }`}>
+                            <FileText className={`h-4 w-4 shrink-0 ${on ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground/40'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-foreground">{f.year} {f.quarter}</span>
+                                <Badge variant="secondary">{f.quarter === 'FY' ? '年报' : '季报'}</Badge>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                                {f.filename} · {fmtBytes(f.file_size)}
+                              </p>
+                            </div>
+                            {on && <CheckCircle2 className="h-5 w-5 text-blue-500 dark:text-blue-400 shrink-0" />}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 )
               })}
@@ -165,19 +179,15 @@ export default function FilingSelector({ isOpen, onClose, onSelect }: FilingSele
         </div>
 
         {/* Footer */}
-        <div className="px-5 sm:px-6 py-4 border-t border-border bg-muted/20 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between shrink-0">
+          <p className="text-[12px] text-muted-foreground">
             {selectedId ? '已选择 1 份财报' : `共 ${filings.length} 份可选`}
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose} className="cursor-pointer">取消</Button>
-            <Button size="sm" disabled={!selectedId}
-              className="gradient-primary text-white cursor-pointer disabled:opacity-50"
-              onClick={() => {
-                const filing = filings.find(f => f.id === selectedId)
-                if (filing) onSelect(filing)
-              }}>
-              选择并分析
+            <Button variant="outline" size="sm" onClick={onClose}>取消</Button>
+            <Button variant="cta" size="sm" disabled={!selectedId || submitting} onClick={handleSelect}>
+              {submitting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+              {submitting ? '分析中...' : '选择并分析'}
             </Button>
           </div>
         </div>

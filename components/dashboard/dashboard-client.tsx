@@ -455,25 +455,18 @@ export default function DashboardClient() {
 
   return (
     <div className="animate-fade-in">
-      {/* Page Header */}
-      <div className="flex items-start justify-between mb-6">
+      {/* Page Header — MASTER.md: spacing-lg, consistent hierarchy */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground tracking-tight">财报分析</h2>
-          <p className="text-sm text-muted-foreground mt-1">AI 投委会级深度分析 <span className="mx-1.5 text-border">|</span> 上传或选择已有财报</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">财报分析</h1>
+          <p className="text-sm text-muted-foreground mt-1">AI 投委会级深度分析 · 上传或选择已有财报</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            onClick={() => setIsFilingSelectorOpen(true)}
-            variant="outline"
-            className="border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
-          >
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => setIsFilingSelectorOpen(true)}>
             <Database className="mr-2 h-4 w-4" />
-            选择已有财报
+            已有财报
           </Button>
-          <Button 
-            onClick={() => setIsUploadOpen(true)}
-            className="gradient-primary text-white shadow-sm shadow-blue-600/20 hover:shadow-md hover:shadow-blue-600/30 transition-all cursor-pointer"
-          >
+          <Button variant="cta" size="sm" onClick={() => setIsUploadOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
             上传财报
           </Button>
@@ -483,14 +476,14 @@ export default function DashboardClient() {
       <div>
         {/* Processing Banner - 只在有有效处理中任务时显示 */}
         {processingAnalyses.length > 0 && (
-          <div className="mb-6 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-5 text-white shadow-lg shadow-amber-500/15">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <Loader2 className="h-6 w-6 animate-spin" />
+          <div className="mb-6 fin-card bg-amber-50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/30 !p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                <Loader2 className="h-5 w-5 text-amber-600 dark:text-amber-400 animate-spin" />
               </div>
               <div>
-                <p className="font-semibold text-lg">正在分析 {processingAnalyses.length} 份财报</p>
-                <p className="text-amber-100 text-sm">AI正在深度分析财报内容，请稍候...</p>
+                <p className="font-semibold text-amber-900 dark:text-amber-200">正在分析 {processingAnalyses.length} 份财报</p>
+                <p className="text-amber-700/70 dark:text-amber-400/70 text-sm">AI 正在深度分析内容，请稍候...</p>
               </div>
             </div>
           </div>
@@ -498,21 +491,19 @@ export default function DashboardClient() {
 
         {/* Stale Tasks Warning */}
         {staleAnalyses.length > 0 && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="mb-6 fin-card bg-rose-50 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/30 !p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
-                  <Trash2 className="h-5 w-5 text-red-600" />
+                <div className="h-10 w-10 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center shrink-0">
+                  <Trash2 className="h-5 w-5 text-rose-600 dark:text-rose-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-red-800">发现 {staleAnalyses.length} 个卡住的任务</p>
-                  <p className="text-sm text-red-600">这些任务已超过10分钟未完成，建议清理</p>
+                  <p className="font-medium text-rose-800 dark:text-rose-200">发现 {staleAnalyses.length} 个卡住的任务</p>
+                  <p className="text-sm text-rose-600/70 dark:text-rose-400/70">超过10分钟未完成，建议清理</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-red-300 text-red-700 hover:bg-red-100"
+              <Button variant="outline" size="sm"
+                className="border-rose-300 text-rose-700 hover:bg-rose-100 dark:border-rose-700 dark:text-rose-400"
                 onClick={cleanupStaleAnalyses}
               >
                 清理无效任务
@@ -521,121 +512,84 @@ export default function DashboardClient() {
           </div>
         )}
 
-        {/* Stats & Filters */}
+        {/* Stats & Filters — MASTER.md: spacing-lg between sections */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           {/* Stats */}
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-blue-600" />
+          <div className="flex items-center gap-5">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900">{completedAnalyses.length}</p>
-                <p className="text-xs text-slate-500">已分析</p>
+                <p className="text-xl font-bold text-foreground font-mono tabular-nums">{completedAnalyses.length}</p>
+                <p className="data-label">已分析</p>
               </div>
             </div>
-            <div className="h-8 w-px bg-slate-200" />
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
-                <Building2 className="h-4 w-4 text-green-600" />
+            <div className="stat-divider" />
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
+                <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-xl font-bold text-foreground font-mono tabular-nums">
                   {new Set(completedAnalyses.map(a => a.company_symbol)).size}
                 </p>
-                <p className="text-xs text-slate-500">家公司</p>
+                <p className="data-label">公司</p>
               </div>
             </div>
           </div>
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 text-sm text-slate-500">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Filter className="h-4 w-4" />
-              <span>筛选:</span>
             </div>
-            
-            {/* Category Filter */}
-            <div className="flex rounded-lg bg-slate-100 p-0.5">
+            <div className="flex rounded-lg bg-muted p-0.5 border border-border/40">
               {CATEGORY_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setCategoryFilter(opt.value)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    categoryFilter === opt.value
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {opt.label}
-                </button>
+                <button key={opt.value} onClick={() => setCategoryFilter(opt.value)}
+                  className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-all duration-200 cursor-pointer ${
+                    categoryFilter === opt.value ? 'bg-card text-foreground shadow-[var(--shadow-sm)]' : 'text-muted-foreground hover:text-foreground'
+                  }`}>{opt.label}</button>
               ))}
             </div>
-
-            {/* Year Filter */}
             {availableYears.length > 0 && (
-              <select
-                value={yearFilter ?? ''}
-                onChange={(e) => setYearFilter(e.target.value ? parseInt(e.target.value) : null)}
-                className="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-medium text-slate-700 border-0 focus:ring-2 focus:ring-blue-500"
-              >
+              <select value={yearFilter ?? ''} onChange={(e) => setYearFilter(e.target.value ? parseInt(e.target.value) : null)}
+                className="px-3 py-1.5 rounded-lg bg-muted text-[13px] font-medium text-foreground border border-border/40 cursor-pointer focus:ring-2 focus:ring-ring/20">
                 <option value="">全部年份</option>
-                {availableYears.map((year) => (
-                  <option key={year} value={year}>{year}年</option>
-                ))}
+                {availableYears.map(y => <option key={y} value={y}>{y}年</option>)}
               </select>
             )}
-
-            {/* Quarter Filter */}
             {availableQuarters.length > 0 && (
-              <select
-                value={quarterFilter ?? ''}
-                onChange={(e) => setQuarterFilter(e.target.value ? parseInt(e.target.value) : null)}
-                className="px-3 py-1.5 rounded-lg bg-slate-100 text-sm font-medium text-slate-700 border-0 focus:ring-2 focus:ring-blue-500"
-              >
+              <select value={quarterFilter ?? ''} onChange={(e) => setQuarterFilter(e.target.value ? parseInt(e.target.value) : null)}
+                className="px-3 py-1.5 rounded-lg bg-muted text-[13px] font-medium text-foreground border border-border/40 cursor-pointer focus:ring-2 focus:ring-ring/20">
                 <option value="">全部季度</option>
-                {availableQuarters.map((q) => (
-                  <option key={q} value={q}>Q{q}</option>
-                ))}
+                {availableQuarters.map(q => <option key={q} value={q}>Q{q}</option>)}
               </select>
             )}
-
-            {/* Clear Filters */}
             {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-1 px-2 py-1.5 text-sm text-slate-500 hover:text-slate-700"
-              >
-                <X className="h-3.5 w-3.5" />
-                清除
+              <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground cursor-pointer transition-colors duration-200">
+                <X className="h-3.5 w-3.5" /> 清除
               </button>
             )}
           </div>
         </div>
 
-        {/* Filter Results Info */}
         {hasFilters && (
-          <div className="mb-4 text-sm text-slate-500">
-            显示 {filteredAnalyses.length} / {completedAnalyses.length} 条结果
-          </div>
+          <p className="mb-4 text-sm text-muted-foreground">
+            {filteredAnalyses.length} / {completedAnalyses.length} 条结果
+          </p>
         )}
 
         {/* Upload Area (when empty) */}
         {completedAnalyses.length === 0 && processingAnalyses.length === 0 && !isLoading && (
           <div className="mb-8">
-            <button 
-              onClick={() => setIsUploadOpen(true)}
-              className="w-full p-12 bg-white rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
-            >
-              <div className="flex flex-col items-center gap-4">
-                <div className="h-16 w-16 rounded-2xl bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                  <Plus className="h-8 w-8 text-blue-600" />
-                </div>
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-slate-900">上传第一份财报</p>
-                  <p className="text-sm text-slate-500 mt-1">支持PDF格式，可同时上传财报和研报进行对比分析</p>
-                </div>
+            <button onClick={() => setIsUploadOpen(true)}
+              className="w-full py-16 sm:py-20 fin-card border-dashed border-2 flex flex-col items-center cursor-pointer group hover:border-primary/40 hover:bg-accent/5">
+              <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors duration-200 mb-4">
+                <Plus className="h-7 w-7 text-muted-foreground group-hover:text-primary" />
               </div>
+              <p className="text-lg font-semibold text-foreground">上传第一份财报</p>
+              <p className="text-sm text-muted-foreground mt-1">支持 PDF / HTML 格式，可同时上传研报进行对比</p>
             </button>
           </div>
         )}
@@ -652,25 +606,20 @@ export default function DashboardClient() {
                   </div>
                   <h2 className="text-lg font-semibold text-slate-800">处理中</h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {processingAnalyses.map((analysis) => (
-                    <div
-                      key={analysis.id}
-                      className="p-6 bg-white/70 rounded-2xl border border-slate-200 animate-pulse min-h-[280px] flex flex-col"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-12 w-12 rounded-xl bg-slate-200 flex items-center justify-center">
-                            <Loader2 className="h-5 w-5 text-slate-400 animate-spin" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-slate-700">{analysis.company_name || '分析中...'}</h3>
-                            <p className="text-xs text-slate-500">{analysis.period}</p>
-                          </div>
+                    <div key={analysis.id} className="fin-card animate-pulse min-h-[200px] flex flex-col">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-foreground text-sm">{analysis.company_name || '分析中...'}</h3>
+                          <p className="text-[11px] text-muted-foreground">{analysis.period}</p>
                         </div>
                       </div>
                       <div className="flex-1 flex items-center justify-center">
-                        <p className="text-sm text-slate-500">AI正在分析中...</p>
+                        <p className="text-sm text-muted-foreground">AI 正在分析中...</p>
                       </div>
                     </div>
                   ))}
@@ -729,11 +678,10 @@ export default function DashboardClient() {
 
         {/* Add New Button - Fixed Position */}
         {completedAnalyses.length > 0 && (
-          <button 
-            onClick={() => setIsUploadOpen(true)}
-            className="fixed bottom-8 right-8 h-14 w-14 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/30 flex items-center justify-center transition-all hover:scale-110"
-          >
-            <Plus className="h-6 w-6" />
+          <button onClick={() => setIsUploadOpen(true)}
+            className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 flex items-center justify-center transition-all duration-200 cursor-pointer z-20"
+            aria-label="上传财报">
+            <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
         )}
 
