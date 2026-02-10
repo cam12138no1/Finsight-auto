@@ -171,6 +171,10 @@ export class OpenRouterClient {
   }
 }
 
-export const openrouter = new OpenRouterClient(
-  process.env.OPENROUTER_API_KEY || ''
-)
+// Validate API key on initialization
+const apiKey = process.env.OPENROUTER_API_KEY
+if (!apiKey) {
+  console.warn('[OpenRouter] ⚠️ OPENROUTER_API_KEY 未设置! AI分析功能将不可用。请在 Render/Vercel 环境变量中设置。')
+}
+
+export const openrouter = new OpenRouterClient(apiKey || '')

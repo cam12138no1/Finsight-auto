@@ -390,6 +390,14 @@ export async function analyzeFinancialReport(
   metadata: ReportMetadata,
   researchReportText?: string  // 可选的研报文本
 ): Promise<AnalysisResult> {
+  // Pre-flight: check API key
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error(
+      'OPENROUTER_API_KEY 未配置。请在 Render 环境变量中添加 OPENROUTER_API_KEY。' +
+      '获取方式: https://openrouter.ai/keys'
+    )
+  }
+
   // Determine company category - use override if provided, otherwise auto-detect
   let companyInfo: {
     category: 'AI_APPLICATION' | 'AI_SUPPLY_CHAIN' | 'UNKNOWN'

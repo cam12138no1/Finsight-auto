@@ -455,20 +455,20 @@ export default function DashboardClient() {
 
   return (
     <div className="animate-fade-in">
-      {/* Page Header — MASTER.md: spacing-lg, consistent hierarchy */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">财报分析</h1>
-          <p className="text-sm text-muted-foreground mt-1">AI 投委会级深度分析 · 上传或选择已有财报</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">财报分析</h1>
+          <p className="text-sm text-muted-foreground mt-1.5">AI 投委会级深度分析 · 上传或选择已有财报</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={() => setIsFilingSelectorOpen(true)}>
+        <div className="flex items-center gap-3 shrink-0">
+          <Button variant="outline" onClick={() => setIsFilingSelectorOpen(true)}>
             <Database className="mr-2 h-4 w-4" />
-            已有财报
+            选择已有财报
           </Button>
-          <Button variant="cta" size="sm" onClick={() => setIsUploadOpen(true)}>
+          <Button variant="cta" onClick={() => setIsUploadOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            上传财报
+            上传财报分析
           </Button>
         </div>
       </div>
@@ -512,29 +512,29 @@ export default function DashboardClient() {
           </div>
         )}
 
-        {/* Stats & Filters — MASTER.md: spacing-lg between sections */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          {/* Stats */}
-          <div className="flex items-center gap-5">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        {/* Stats & Filters */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* Stats — larger, more visible */}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <p className="text-xl font-bold text-foreground font-mono tabular-nums">{completedAnalyses.length}</p>
-                <p className="data-label">已分析</p>
+                <p className="text-2xl font-bold text-foreground font-mono tabular-nums">{completedAnalyses.length}</p>
+                <p className="text-xs font-medium text-muted-foreground">已分析</p>
               </div>
             </div>
-            <div className="stat-divider" />
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
-                <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="h-10 w-px bg-border" />
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-xl font-bold text-foreground font-mono tabular-nums">
+                <p className="text-2xl font-bold text-foreground font-mono tabular-nums">
                   {new Set(completedAnalyses.map(a => a.company_symbol)).size}
                 </p>
-                <p className="data-label">公司</p>
+                <p className="text-xs font-medium text-muted-foreground">家公司</p>
               </div>
             </div>
           </div>
@@ -582,14 +582,24 @@ export default function DashboardClient() {
 
         {/* Upload Area (when empty) */}
         {completedAnalyses.length === 0 && processingAnalyses.length === 0 && !isLoading && (
-          <div className="mb-8">
+          {/* Empty state — two action cards side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <button onClick={() => setIsUploadOpen(true)}
-              className="w-full py-16 sm:py-20 fin-card border-dashed border-2 flex flex-col items-center cursor-pointer group hover:border-primary/40 hover:bg-accent/5">
-              <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors duration-200 mb-4">
-                <Plus className="h-7 w-7 text-muted-foreground group-hover:text-primary" />
+              className="p-8 sm:p-10 fin-card border-dashed border-2 flex flex-col items-center text-center cursor-pointer group hover:border-emerald-400/60 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10 transition-all duration-200">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/30 transition-colors duration-200 mb-5">
+                <Upload className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <p className="text-lg font-semibold text-foreground">上传第一份财报</p>
-              <p className="text-sm text-muted-foreground mt-1">支持 PDF / HTML 格式，可同时上传研报进行对比</p>
+              <p className="text-lg font-semibold text-foreground mb-1">上传财报分析</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">上传 PDF 格式的财报和研报<br />AI 将生成投委会级分析报告</p>
+            </button>
+
+            <button onClick={() => setIsFilingSelectorOpen(true)}
+              className="p-8 sm:p-10 fin-card border-dashed border-2 flex flex-col items-center text-center cursor-pointer group hover:border-blue-400/60 hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-all duration-200">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors duration-200 mb-5">
+                <Database className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="text-lg font-semibold text-foreground mb-1">选择已下载财报</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">从 SEC EDGAR 数据库中选择<br />可同时上传研报进行 Beat/Miss 对比</p>
             </button>
           </div>
         )}
@@ -702,32 +712,38 @@ export default function DashboardClient() {
         }}
       />
 
-      {/* Filing Selector Modal (从数据库选择已下载财报) */}
+      {/* Filing Selector Modal (从数据库选择已下载财报 + 可选研报上传) */}
       <FilingSelector
         isOpen={isFilingSelectorOpen}
         onClose={() => setIsFilingSelectorOpen(false)}
-        onSelect={async (filing) => {
+        onAnalyze={async (filingId, category, researchFile) => {
           setIsFilingSelectorOpen(false)
-          // Directly trigger analysis from database filing
           try {
-            const res = await fetch('/api/reports/analyze-filing', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                filingId: filing.id,
-                category: filing.category === 'AI_Applications' ? 'AI_APPLICATION' : 'AI_SUPPLY_CHAIN',
-              }),
-            })
-            const data = await res.json()
-            if (data.success) {
-              // Refresh dashboard to show the new analysis
-              loadDashboardData(true)
+            // Use FormData if research file is provided
+            if (researchFile) {
+              const formData = new FormData()
+              formData.append('filingId', String(filingId))
+              formData.append('category', category)
+              formData.append('researchFile', researchFile)
+              const res = await fetch('/api/reports/analyze-filing', {
+                method: 'POST',
+                body: formData,
+              })
+              const data = await res.json()
+              if (data.success) { loadDashboardData(true) }
+              else { alert(data.error || '分析失败，请重试') }
             } else {
-              console.error('Analysis failed:', data.error)
-              alert(data.error || '分析失败，请重试')
+              const res = await fetch('/api/reports/analyze-filing', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filingId, category }),
+              })
+              const data = await res.json()
+              if (data.success) { loadDashboardData(true) }
+              else { alert(data.error || '分析失败，请重试') }
             }
           } catch (err: any) {
-            console.error('Analysis request failed:', err)
+            console.error('Analysis failed:', err)
             alert('网络错误，请重试')
           }
         }}

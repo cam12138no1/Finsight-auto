@@ -63,8 +63,8 @@ export default function Sidebar() {
                 <Icon className={`h-4 w-4 ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium leading-tight truncate">{item.name}</p>
-                <p className={`text-[10px] leading-tight truncate ${isActive ? 'text-slate-400' : 'text-slate-600'}`}>{item.desc}</p>
+                <p className="text-sm font-medium leading-tight truncate">{item.name}</p>
+                <p className={`text-[11px] leading-tight truncate ${isActive ? 'text-slate-400' : 'text-slate-600'}`}>{item.desc}</p>
               </div>
               {isActive && <div className="w-1 h-4 rounded-full bg-blue-500 shrink-0" />}
             </Link>

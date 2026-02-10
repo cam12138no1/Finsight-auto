@@ -50,11 +50,11 @@ export default function Header({ user }: HeaderProps) {
               <div key={c.path} className="flex items-center gap-1 min-w-0">
                 {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}
                 {i < crumbs.length - 1 ? (
-                  <Link href={c.path} className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors truncate cursor-pointer">
+                  <Link href={c.path} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors truncate cursor-pointer">
                     {c.label}
                   </Link>
                 ) : (
-                  <span className="text-[13px] font-semibold text-foreground truncate">{c.label}</span>
+                  <span className="text-sm font-semibold text-foreground truncate">{c.label}</span>
                 )}
               </div>
             ))}
