@@ -107,6 +107,113 @@ const CATEGORY_OPTIONS = [
   { value: 'AI_SUPPLY_CHAIN' as CategoryFilter, label: 'AI供应链', icon: Cpu },
 ]
 
+function getBeatMissIcon(beatMiss?: string) {
+  if (!beatMiss) return <Minus className="h-4 w-4 text-gray-400" />
+  const lower = beatMiss.toLowerCase()
+  if (lower.includes('beat')) return <TrendingUp className="h-4 w-4 text-green-500" />
+  if (lower.includes('miss')) return <TrendingDown className="h-4 w-4 text-red-500" />
+  return <Minus className="h-4 w-4 text-gray-400" />
+}
+
+function getThreeConclusions(analysis: Analysis) {
+  const conclusions: string[] = []
+  if (analysis.one_line_conclusion) conclusions.push(analysis.one_line_conclusion)
+  if (analysis.sustainability_risks?.sustainable_drivers?.[0])
+    conclusions.push(`✓ ${analysis.sustainability_risks.sustainable_drivers[0]}`)
+  if (analysis.sustainability_risks?.main_risks?.[0])
+    conclusions.push(`⚠ ${analysis.sustainability_risks.main_risks[0]}`)
+  return conclusions.slice(0, 3)
+}
+
+function AnalysisCard({ analysis, onSelect }: { analysis: Analysis; onSelect: (a: Analysis) => void }) {
+  const conclusions = getThreeConclusions(analysis)
+  const beatMiss = analysis.comparison_snapshot?.beat_miss || analysis.final_judgment?.net_impact
+  return (
+    <button
+      key={analysis.id}
+      onClick={() => onSelect(analysis)}
+      className="p-6 bg-white rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/10 transition-all text-left group"
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-bold text-slate-600 text-sm">
+            {analysis.company_symbol?.slice(0, 4) || 'N/A'}
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+              {analysis.company_name}
+            </h3>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-slate-500">{analysis.period}</p>
+              {analysis.category && (
+                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                  analysis.category === 'AI_APPLICATION' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
+                }`}>
+                  {analysis.category === 'AI_APPLICATION' ? '应用' : '供应链'}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+      </div>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100">
+          {getBeatMissIcon(beatMiss)}
+          <span className="text-xs font-medium text-slate-600">
+            {beatMiss?.replace('Strong ', '').replace('Moderate ', '') || 'Inline'}
+          </span>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {conclusions.map((conclusion, idx) => (
+          <p key={idx} className="text-sm text-slate-600 line-clamp-2 leading-relaxed">{conclusion}</p>
+        ))}
+        {conclusions.length === 0 && (
+          <p className="text-sm text-slate-400 italic">分析结果加载中...</p>
+        )}
+      </div>
+      <div className="mt-4 pt-4 border-t border-slate-100">
+        <p className="text-xs text-slate-400">
+          {new Date(analysis.created_at).toLocaleDateString('zh-CN', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}
+        </p>
+      </div>
+    </button>
+  )
+}
+
+function CategorySection({
+  title,
+  icon,
+  analyses,
+  bgColor,
+  onSelectAnalysis,
+}: {
+  title: string
+  icon: React.ReactNode
+  analyses: Analysis[]
+  bgColor: string
+  onSelectAnalysis: (a: Analysis) => void
+}) {
+  if (analyses.length === 0) return null
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-2 mb-4">
+        <div className={`h-8 w-8 rounded-lg ${bgColor} flex items-center justify-center`}>{icon}</div>
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <span className="text-sm text-muted-foreground">({analyses.length})</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {analyses.map((a) => <AnalysisCard key={a.id} analysis={a} onSelect={onSelectAnalysis} />)}
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardClient() {
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [isFilingSelectorOpen, setIsFilingSelectorOpen] = useState(false)
@@ -305,155 +412,13 @@ export default function DashboardClient() {
   // 是否有任何筛选条件
   const hasFilters = categoryFilter !== 'ALL' || yearFilter !== null || quarterFilter !== null
 
-  // 清除所有筛选
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setCategoryFilter('ALL')
     setYearFilter(null)
     setQuarterFilter(null)
-  }
+  }, [])
 
-  // 获取Beat/Miss图标
-  const getBeatMissIcon = (beatMiss?: string) => {
-    if (!beatMiss) return <Minus className="h-4 w-4 text-gray-400" />
-    const lower = beatMiss.toLowerCase()
-    if (lower.includes('beat')) {
-      return <TrendingUp className="h-4 w-4 text-green-500" />
-    } else if (lower.includes('miss')) {
-      return <TrendingDown className="h-4 w-4 text-red-500" />
-    }
-    return <Minus className="h-4 w-4 text-gray-400" />
-  }
-
-  // 获取推荐颜色
-  const getRecommendationColor = (rec?: string) => {
-    if (!rec) return 'bg-gray-100 text-gray-600'
-    if (rec.includes('超配')) return 'bg-green-100 text-green-700'
-    if (rec.includes('低配')) return 'bg-red-100 text-red-700'
-    return 'bg-blue-100 text-blue-700'
-  }
-
-  // 提取核心结论 - 只保留客观事实，删除主观判断
-  const getThreeConclusions = (analysis: Analysis) => {
-    const conclusions: string[] = []
-    
-    // 1. 一句话结论（客观事实）
-    if (analysis.one_line_conclusion) {
-      conclusions.push(analysis.one_line_conclusion)
-    }
-    
-    // 2. 可持续驱动（客观事实）
-    if (analysis.sustainability_risks?.sustainable_drivers?.[0]) {
-      conclusions.push(`✓ ${analysis.sustainability_risks.sustainable_drivers[0]}`)
-    }
-    
-    // 3. 主要风险（客观事实）
-    if (analysis.sustainability_risks?.main_risks?.[0]) {
-      conclusions.push(`⚠ ${analysis.sustainability_risks.main_risks[0]}`)
-    }
-    
-    return conclusions.slice(0, 3)
-  }
-
-  // 渲染分析卡片
-  const renderAnalysisCard = (analysis: Analysis) => {
-    const conclusions = getThreeConclusions(analysis)
-    const beatMiss = analysis.comparison_snapshot?.beat_miss || analysis.final_judgment?.net_impact
-    // recommendation 已删除 - 只保留客观数据对比
-
-    return (
-      <button
-        key={analysis.id}
-        onClick={() => setSelectedAnalysis(analysis)}
-        className="p-6 bg-white rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/10 transition-all text-left group"
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-bold text-slate-600 text-sm">
-              {analysis.company_symbol?.slice(0, 4) || 'N/A'}
-            </div>
-            <div>
-              <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                {analysis.company_name}
-              </h3>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-500">{analysis.period}</p>
-                {analysis.category && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded ${
-                    analysis.category === 'AI_APPLICATION' 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'bg-purple-50 text-purple-600'
-                  }`}>
-                    {analysis.category === 'AI_APPLICATION' ? '应用' : '供应链'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
-        </div>
-
-        {/* Beat/Miss & Recommendation */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100">
-            {getBeatMissIcon(beatMiss)}
-            <span className="text-xs font-medium text-slate-600">
-              {beatMiss?.replace('Strong ', '').replace('Moderate ', '') || 'Inline'}
-            </span>
-          </div>
-{/* 投资建议已删除 - 只保留客观数据对比 */}
-        </div>
-
-        {/* 3 Key Conclusions */}
-        <div className="space-y-2">
-          {conclusions.map((conclusion, idx) => (
-            <p 
-              key={idx} 
-              className="text-sm text-slate-600 line-clamp-2 leading-relaxed"
-            >
-              {conclusion}
-            </p>
-          ))}
-          {conclusions.length === 0 && (
-            <p className="text-sm text-slate-400 italic">分析结果加载中...</p>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-4 pt-4 border-t border-slate-100">
-          <p className="text-xs text-slate-400">
-            {new Date(analysis.created_at).toLocaleDateString('zh-CN', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })}
-          </p>
-        </div>
-      </button>
-    )
-  }
-
-  // 渲染分类区块
-  const renderCategorySection = (title: string, icon: React.ReactNode, analyses: Analysis[], bgColor: string) => {
-    if (analyses.length === 0) return null
-    
-    return (
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <div className={`h-8 w-8 rounded-lg ${bgColor} flex items-center justify-center`}>
-            {icon}
-          </div>
-          <h2 className="text-lg font-semibold text-slate-800">{title}</h2>
-          <span className="text-sm text-slate-500">({analyses.length})</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {analyses.map(renderAnalysisCard)}
-        </div>
-      </div>
-    )
-  }
-
-  return (
+  const content = (
     <div className="animate-fade-in">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
@@ -580,9 +545,8 @@ export default function DashboardClient() {
           </p>
         )}
 
-        {/* Upload Area (when empty) */}
+        {/* Upload Area (when empty) — two action cards side by side */}
         {completedAnalyses.length === 0 && processingAnalyses.length === 0 && !isLoading && (
-          {/* Empty state — two action cards side by side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <button onClick={() => setIsUploadOpen(true)}
               className="p-8 sm:p-10 fin-card border-dashed border-2 flex flex-col items-center text-center cursor-pointer group hover:border-emerald-400/60 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10 transition-all duration-200">
@@ -641,33 +605,40 @@ export default function DashboardClient() {
             {categoryFilter === 'ALL' ? (
               <>
                 {/* AI Application Companies */}
-                {renderCategorySection(
-                  'AI应用公司',
-                  <Building2 className="h-4 w-4 text-blue-600" />,
-                  groupedAnalyses.aiApp,
-                  'bg-blue-100'
-                )}
+                <CategorySection
+                  title="AI应用公司"
+                  icon={<Building2 className="h-4 w-4 text-blue-600" />}
+                  analyses={groupedAnalyses.aiApp}
+                  bgColor="bg-blue-100"
+                  onSelectAnalysis={setSelectedAnalysis}
+                />
 
                 {/* AI Supply Chain Companies */}
-                {renderCategorySection(
-                  'AI供应链公司',
-                  <Cpu className="h-4 w-4 text-purple-600" />,
-                  groupedAnalyses.aiSupply,
-                  'bg-purple-100'
-                )}
+                <CategorySection
+                  title="AI供应链公司"
+                  icon={<Cpu className="h-4 w-4 text-purple-600" />}
+                  analyses={groupedAnalyses.aiSupply}
+                  bgColor="bg-purple-100"
+                  onSelectAnalysis={setSelectedAnalysis}
+                />
 
                 {/* Other/Uncategorized */}
-                {groupedAnalyses.other.length > 0 && renderCategorySection(
-                  '其他',
-                  <FileText className="h-4 w-4 text-slate-600" />,
-                  groupedAnalyses.other,
-                  'bg-slate-100'
+                {groupedAnalyses.other.length > 0 && (
+                  <CategorySection
+                    title="其他"
+                    icon={<FileText className="h-4 w-4 text-slate-600" />}
+                    analyses={groupedAnalyses.other}
+                    bgColor="bg-slate-100"
+                    onSelectAnalysis={setSelectedAnalysis}
+                  />
                 )}
               </>
             ) : (
               // Filtered view - show as flat grid
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAnalyses.map(renderAnalysisCard)}
+                {filteredAnalyses.map((a) => (
+                  <AnalysisCard key={a.id} analysis={a} onSelect={setSelectedAnalysis} />
+                ))}
               </div>
             )}
 
@@ -758,4 +729,5 @@ export default function DashboardClient() {
       )}
     </div>
   )
+  return content
 }

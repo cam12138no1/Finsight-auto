@@ -47,6 +47,11 @@ const QUARTER_OPTIONS = [
 // 文件大小限制：500MB
 const MAX_FILE_SIZE = 500 * 1024 * 1024
 
+// 轮询超时：5分钟（网络错误后检查分析完成状态）
+const MAX_POLL_TIME = 5 * 60 * 1000
+// 轮询间隔：3秒
+const POLL_INTERVAL = 3 * 1000
+
 export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
   const [financialFiles, setFinancialFiles] = useState<FileItem[]>([])
   const [researchFiles, setResearchFiles] = useState<FileItem[]>([])

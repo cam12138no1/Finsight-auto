@@ -40,7 +40,7 @@ export interface AnalysisResultRecord {
 
 export async function getCompanyBySymbol(symbol: string): Promise<Company | null> {
   const result = await query('SELECT * FROM companies WHERE ticker = $1', [symbol])
-  return (result.rows[0] as Company) || null
+  return (result.rows[0] as unknown as Company) || null
 }
 
 export async function createCompany(data: {
@@ -50,7 +50,7 @@ export async function createCompany(data: {
     'INSERT INTO companies (ticker, name, category) VALUES ($1, $2, $3) RETURNING *',
     [data.symbol, data.name, data.sector || 'AI_Applications']
   )
-  return result.rows[0] as Company
+  return result.rows[0] as unknown as Company
 }
 
 export async function createFinancialReport(data: {
@@ -63,7 +63,7 @@ export async function createFinancialReport(data: {
     [data.company_id, data.report_type, data.fiscal_year, data.fiscal_quarter || null,
      data.filing_date.toISOString(), data.document_url || null, data.document_size || null]
   )
-  return result.rows[0] as FinancialReport
+  return result.rows[0] as unknown as FinancialReport
 }
 
 export async function createAnalysisResult(data: {
@@ -77,7 +77,7 @@ export async function createAnalysisResult(data: {
      JSON.stringify(data.key_insights || null), JSON.stringify(data.risk_factors || null),
      JSON.stringify(data.model_impact || null)]
   )
-  return result.rows[0] as AnalysisResultRecord
+  return result.rows[0] as unknown as AnalysisResultRecord
 }
 
 export async function getReportsByCompany(companyId: number): Promise<FinancialReport[]> {
@@ -85,7 +85,7 @@ export async function getReportsByCompany(companyId: number): Promise<FinancialR
     'SELECT * FROM financial_reports WHERE company_id = $1 ORDER BY fiscal_year DESC, fiscal_quarter DESC',
     [companyId]
   )
-  return result.rows as FinancialReport[]
+  return result.rows as unknown as FinancialReport[]
 }
 
 export async function getAnalysisByReportId(reportId: number): Promise<AnalysisResultRecord | null> {
@@ -93,7 +93,7 @@ export async function getAnalysisByReportId(reportId: number): Promise<AnalysisR
     'SELECT * FROM analysis_results WHERE report_id = $1 ORDER BY created_at DESC LIMIT 1',
     [reportId]
   )
-  return (result.rows[0] as AnalysisResultRecord) || null
+  return (result.rows[0] as unknown as AnalysisResultRecord) || null
 }
 
 export async function updateReportProcessed(reportId: number, processed: boolean): Promise<void> {
@@ -102,7 +102,7 @@ export async function updateReportProcessed(reportId: number, processed: boolean
 
 export async function getAllCompanies(): Promise<Company[]> {
   const result = await query('SELECT * FROM companies ORDER BY name ASC')
-  return result.rows as Company[]
+  return result.rows as unknown as Company[]
 }
 
 export async function getRecentAnalyses(limit: number = 10): Promise<any[]> {

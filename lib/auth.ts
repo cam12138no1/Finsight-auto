@@ -73,8 +73,8 @@ export const authOptions: NextAuthOptions = {
               id: demoUser.id,
               email: demoUser.email,
               name: demoUser.name,
-              role: demoUser.role,
-              permissions: demoUser.permissions,
+              role: demoUser.role as string,
+              permissions: demoUser.permissions as string[],
             }
           }
           
@@ -99,14 +99,14 @@ export const authOptions: NextAuthOptions = {
                 id: demoUser.id,
                 email: demoUser.email,
                 name: demoUser.name,
-                role: demoUser.role,
-                permissions: demoUser.permissions,
+                role: demoUser.role as string,
+                permissions: demoUser.permissions as string[],
               }
             }
             return null
           }
 
-          const user = result.rows[0]
+          const user = result.rows[0] as { id: unknown; email: unknown; name: unknown; password_hash: string; role: unknown; permissions: unknown }
           const isPasswordValid = await compare(credentials.password, user.password_hash)
 
           if (!isPasswordValid) {
@@ -115,11 +115,11 @@ export const authOptions: NextAuthOptions = {
 
           console.log(`[Auth] Database login: ${user.email} (ID: ${user.id})`)
           return {
-            id: user.id.toString(),
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            permissions: user.permissions,
+            id: String(user.id),
+            email: String(user.email),
+            name: String(user.name ?? ''),
+            role: String(user.role ?? 'viewer'),
+            permissions: Array.isArray(user.permissions) ? user.permissions : [],
           }
         } catch (error) {
           console.error('[Auth] Database error:', error)
@@ -132,8 +132,8 @@ export const authOptions: NextAuthOptions = {
               id: demoUser.id,
               email: demoUser.email,
               name: demoUser.name,
-              role: demoUser.role,
-              permissions: demoUser.permissions,
+              role: demoUser.role as string,
+              permissions: demoUser.permissions as string[],
             }
           }
           
