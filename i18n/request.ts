@@ -1,5 +1,4 @@
 import { getRequestConfig } from 'next-intl/server'
-import { cookies } from 'next/headers'
 
 // Only support Chinese now
 export const locales = ['zh'] as const
@@ -11,6 +10,6 @@ export default getRequestConfig(async () => {
   // Always use Chinese
   return {
     locale: 'zh',
-    messages: (await import(`./messages/zh.json`)).default,
+    messages: (await import(`../messages/zh.json`)).default,
   }
 })
